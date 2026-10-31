@@ -13,6 +13,7 @@ Future<(int, String)> get(Uri u) async {
 }
 
 void main() {
+  browserTests();
   late Directory dir;
   setUp(() => dir = Directory.systemTemp.createTempSync('ls_'));
   tearDown(() => dir.deleteSync(recursive: true));
@@ -100,5 +101,27 @@ void main() {
     expect(r.$1, 404);
     await Future.delayed(const Duration(milliseconds: 50));
     expect(states, contains(TransferState.failed));
+  });
+}
+
+void browserTests() {
+  test('browser request returns HTML with working download links', () async {
+    final dir = Directory.systemTemp.createTempSync('ls_b');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final f = File('${dir.path}/pic &1.txt')..writeAsStringSync('data');
+    final s = SenderServer([f], TokenStore(),
+        bindAddress: InternetAddress.loopbackIPv4);
+    addTearDown(s.stop);
+    final link = await s.start();
+    final c = HttpClient();
+    final req = await c.getUrl(link);
+    req.headers.set('Accept', 'text/html');
+    final res = await req.close();
+    final html = await utf8.decodeStream(res);
+    expect(res.headers.contentType?.mimeType, 'text/html');
+    expect(html, contains('pic &amp;1.txt'));
+    final href = RegExp(r'href="([^"]+)"').firstMatch(html)!.group(1)!;
+    expect((await get(link.resolve(href))).$2, 'data');
+    c.close();
   });
 }

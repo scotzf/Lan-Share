@@ -101,7 +101,7 @@ class SenderServer {
   }
 
   Future<void> _manifest(HttpRequest req) async {
-    final list = [
+    final List<Map<String, Object>> list = [
       for (var i = 0; i < files.length; i++)
         {
           'name': files[i].uri.pathSegments.last,
@@ -109,10 +109,39 @@ class SenderServer {
           'url': '/s/$_session/f/$i',
         }
     ];
-    req.response
-      ..headers.contentType = ContentType.json
-      ..write(jsonEncode({'session': _session, 'files': list}));
+    final wantsHtml =
+        (req.headers.value('accept') ?? '').contains('text/html');
+    if (wantsHtml) {
+      req.response
+        ..headers.contentType = ContentType.html
+        ..write(_page(list));
+    } else {
+      req.response
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode({'session': _session, 'files': list}));
+    }
     await req.response.close();
+  }
+
+  String _page(List<Map<String, Object>> list) {
+    final esc = const HtmlEscape(HtmlEscapeMode.attribute);
+    final rows = list.map((f) {
+      final mb = ((f['size'] as int) / 1048576).toStringAsFixed(1);
+      return '<a class="f" href="${esc.convert(f['url'] as String)}" download>'
+          '<span class="i">&#x2B07;</span>'
+          '<span class="n">${esc.convert(f['name'] as String)}</span>'
+          '<span class="s">$mb MB</span></a>';
+    }).join();
+    return '<!doctype html><meta charset=utf-8>'
+        '<meta name=viewport content="width=device-width,initial-scale=1">'
+        '<title>Share</title><style>'
+        'body{margin:0;padding:16px;font:16px system-ui;background:#0f172a;color:#f8fafc}'
+        '.f{display:flex;align-items:center;gap:12px;padding:16px;margin-bottom:12px;'
+        'border-radius:16px;background:#1e293b;color:inherit;text-decoration:none}'
+        '.i{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;'
+        'background:#22c55e;color:#04210f;font-size:20px}'
+        '.n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+        '.s{opacity:.6;font-size:13px}</style>$rows';
   }
 
   Future<void> _file(HttpRequest req, int i) async {
