@@ -112,7 +112,7 @@ void main() {
       await for (final chunk in res2) {
         n += chunk.length;
       }
-    } catch (e, st) {
+    } catch (e) {
       // ignore: avoid_print
       print('second download failed after $n bytes: $e');
       rethrow;

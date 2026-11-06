@@ -1,6 +1,7 @@
 // End-to-end journeys as a phone would take them, against the real server over real TLS.
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
