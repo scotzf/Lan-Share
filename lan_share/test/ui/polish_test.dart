@@ -51,6 +51,10 @@ void manualTests() {
     expect(find.text('123 456'), findsOneWidget);
     expect(find.byKey(const Key('qr')), findsNothing);
     expect(find.byKey(const Key('manual')), findsOneWidget);
+    expect(find.text('Scan QR'), findsOneWidget);
+    await t.pumpWidget(host(SendView(
+      phase: Phase.waiting, link: link, fileCount: 1, accessCode: '123456')));
+    expect(find.text('No scanner?'), findsOneWidget);
     await t.pumpWidget(host(SendView(phase: Phase.waiting, link: link, fileCount: 1)));
     expect(find.byKey(const Key('manual')), findsNothing);
   });

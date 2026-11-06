@@ -58,19 +58,30 @@ class SendView extends StatelessWidget {
                 icon: const Icon(Icons.close),
               ),
               const Spacer(),
-              if (phase == Phase.waiting && link != null && pairCode == null && accessCode != null)
-                IconButton.filledTonal(
-                  key: const Key('manual'),
-                  onPressed: onToggleManual,
-                  icon: Icon(showManual ? Icons.qr_code_2 : Icons.dialpad),
-                ),
             ]),
             Expanded(child: Center(child: _hero(color))),
+            _switchLink(),
             FileChips(names: fileNames, count: fileCount, color: color),
             const SizedBox(height: 16),
             _action(),
           ]),
         ),
+      ),
+    );
+  }
+
+  /// Text link under the QR: swaps between the QR and the typed code.
+  Widget _switchLink() {
+    final available = phase == Phase.waiting && link != null && pairCode == null && accessCode != null;
+    if (!available) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextButton.icon(
+        key: const Key('manual'),
+        onPressed: onToggleManual,
+        icon: Icon(showManual ? Icons.qr_code_2 : Icons.dialpad, size: 20),
+        label: Text(showManual ? 'Scan QR' : 'No scanner?',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
       ),
     );
   }
