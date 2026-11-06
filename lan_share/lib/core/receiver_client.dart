@@ -136,13 +136,18 @@ class ReceiverClient {
     }
     final total = res.contentLength;
     var got = 0;
+    var lastEmit = -1000;
+    final clock = Stopwatch()..start();
     final sink = out.openWrite();
     var ok = false;
     try {
       await sink.addStream(res.map((chunk) {
         got += chunk.length;
-        _progress.add(TransferProgress(TransferState.active,
-            sent: got, total: total, name: name));
+        if (clock.elapsedMilliseconds - lastEmit >= 100) {
+          lastEmit = clock.elapsedMilliseconds;
+          _progress.add(TransferProgress(TransferState.active,
+              sent: got, total: total, name: name));
+        }
         return chunk;
       }));
       ok = true;

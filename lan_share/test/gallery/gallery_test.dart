@@ -50,7 +50,7 @@ void main() {
       'qr': () => SendView(phase: Phase.waiting, link: link, fileCount: 3, fileNames: names, accessCode: '482915', remaining: .7, onToggleManual: noop, onClose: noop),
       'manual': () => SendView(phase: Phase.waiting, link: link, fileCount: 3, fileNames: names, accessCode: '482915', manualAddress: '192.168.1.3', showManual: true, onToggleManual: noop, onClose: noop),
       'pair': () => SendView(phase: Phase.waiting, link: link, fileCount: 3, fileNames: names, pairCode: '4821', onApprove: noop, onDeny: noop, onClose: noop),
-      'active': () => SendView(phase: Phase.active, link: link, fileCount: 3, fileNames: names, fraction: .62, onClose: noop),
+      'active': () => SendView(phase: Phase.active, link: link, fileCount: 3, fileNames: names, fraction: .62, speedMBps: 12.4, onClose: noop),
       'done': () => SendView(phase: Phase.done, link: null, fileCount: 3, fileNames: names, onClose: noop),
       'failed': () => SendView(phase: Phase.failed, link: null, fileCount: 3, fileNames: names, onRetry: noop, onClose: noop),
       'expired': () => SendView(phase: Phase.expired, link: null, fileCount: 3, fileNames: names, onRefresh: noop, onClose: noop),

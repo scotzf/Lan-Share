@@ -54,6 +54,10 @@ class SenderServer {
       (Random.secure().nextInt(900000) + 100000).toString();
   int _badCodes = 0;
   final Set<int> _finished = {};
+  int _sentTotal = 0;
+  int? _grand;
+
+  int _grandTotal() => _grand ??= files.fold<int>(0, (a, f) => a + (f.existsSync() ? f.lengthSync() : 0));
   final _progress = StreamController<TransferProgress>.broadcast();
   final _pairReq = StreamController<PairRequest>.broadcast();
   final Map<String, String> _pairStatus = {};
@@ -264,20 +268,37 @@ class SenderServer {
       return _reply(req, 404);
     }
     final total = f.lengthSync();
+    final grand = _grandTotal();
     var sent = 0;
+    var lastEmit = -1000;
+    final clock = Stopwatch()..start();
+    void emit() {
+      _progress.add(TransferProgress(TransferState.active,
+          sent: sent,
+          total: total,
+          name: name,
+          overallSent: _sentTotal > grand ? grand : _sentTotal,
+          overallTotal: grand));
+    }
+
     req.response
       ..headers.contentType = ContentType.binary
       ..headers.set('Content-Disposition',
-          'attachment; filename*=UTF-8\'\'${Uri.encodeComponent(name)}')
+          'attachment; filename*=UTF-8''${Uri.encodeComponent(name)}')
       ..contentLength = total;
     try {
       await req.response.addStream(f.openRead().map((c) {
         sent += c.length;
-        _progress.add(TransferProgress(TransferState.active,
-            sent: sent, total: total, name: name));
+        _sentTotal += c.length;
+        // a screen cannot use thousands of updates a second; ten is plenty
+        if (clock.elapsedMilliseconds - lastEmit >= 100) {
+          lastEmit = clock.elapsedMilliseconds;
+          emit();
+        }
         return c;
       }));
       await req.response.close();
+      emit(); // final figure for this file
     } catch (_) {
       _progress.add(TransferProgress(TransferState.failed, name: name));
       return;

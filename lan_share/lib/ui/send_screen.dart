@@ -40,6 +40,9 @@ class _SendScreenState extends State<SendScreen> {
   Uri? _link;
   Phase _phase = Phase.waiting;
   double _fraction = 0;
+  double? _speed;
+  int _lastBytes = 0;
+  DateTime _lastAt = DateTime.now();
   PairRequest? _pair;
   bool _manual = false;
 
@@ -67,6 +70,9 @@ class _SendScreenState extends State<SendScreen> {
     setState(() {
       _phase = Phase.waiting;
       _fraction = 0;
+      _speed = null;
+      _lastBytes = 0;
+      _lastAt = DateTime.now();
       _pair = null;
       _link = null;
       _manual = false;
@@ -123,7 +129,15 @@ class _SendScreenState extends State<SendScreen> {
       switch (p.state) {
         case TransferState.active:
           _phase = Phase.active;
-          _fraction = p.fraction;
+          _fraction = p.overallFraction;
+          final now = DateTime.now();
+          final dt = now.difference(_lastAt).inMilliseconds;
+          if (dt >= 500) {
+            final inst = (p.overallSent - _lastBytes) / (1 << 20) / (dt / 1000);
+            _speed = _speed == null ? inst : _speed! * .6 + inst * .4;
+            _lastBytes = p.overallSent;
+            _lastAt = now;
+          }
         case TransferState.done:
           _phase = Phase.done;
           _releaseHotspot();
@@ -249,6 +263,7 @@ class _SendScreenState extends State<SendScreen> {
           fileNames: [for (final f in widget.files) f.uri.pathSegments.last],
           remaining: _remaining,
           fraction: _fraction,
+          speedMBps: _speed,
           pairCode: _pair?.code,
           accessCode: _server?.accessCode,
           manualAddress: _server?.shortAddress,

@@ -10,6 +10,7 @@ Widget host(Widget w) => MaterialApp(theme: appTheme(), home: Scaffold(body: w))
 void main() {
   manualTests();
   offlineTests();
+  speedTests();
   test('file types get their own icon and colour', () {
     expect(fileLook('a.PNG').$2, C.violet);
     expect(fileLook('a.mp4').$2, C.red);
@@ -71,5 +72,18 @@ void offlineTests() {
     expect(find.byKey(const Key('qr')), findsNothing);
     await t.tap(find.text('Retry'));
     expect(retried, isTrue);
+  });
+}
+
+void speedTests() {
+  testWidgets('active shows the live speed under the ring', (t) async {
+    await t.pumpWidget(host(SendView(
+        phase: Phase.active, link: null, fileCount: 2, fraction: .4, speedMBps: 12.46)));
+    expect(find.text('12.5 MB/s'), findsOneWidget);
+    await t.pumpWidget(host(SendView(phase: Phase.active, link: null, fileCount: 2, fraction: .4)));
+    expect(find.textContaining('MB/s'), findsNothing);
+    await t.pumpWidget(host(SendView(
+        phase: Phase.done, link: null, fileCount: 2, speedMBps: 12.46)));
+    expect(find.textContaining('MB/s'), findsNothing);
   });
 }

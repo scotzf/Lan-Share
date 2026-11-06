@@ -26,6 +26,7 @@ class SendView extends StatelessWidget {
     required this.fileCount,
     this.fileNames = const [],
     this.fraction = 0,
+    this.speedMBps,
     this.remaining = 1,
     this.pairCode,
     this.accessCode,
@@ -49,6 +50,9 @@ class SendView extends StatelessWidget {
   final int fileCount;
   final List<String> fileNames;
   final double fraction;
+
+  /// Live transfer speed, shown under the ring while sending.
+  final double? speedMBps;
 
   /// Life left on the QR code, 1 -> 0.
   final double remaining;
@@ -136,7 +140,15 @@ class SendView extends StatelessWidget {
       if (showManual && link != null && accessCode != null) return _manual(context);
       if (link != null) return _linkQr(color);
     }
-    return TransferRing(phase: phase, fraction: fraction, size: 230);
+    final ring = TransferRing(phase: phase, fraction: fraction, size: 230);
+    if (phase != Phase.active || speedMBps == null) return ring;
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      ring,
+      const SizedBox(height: 20),
+      Text('${speedMBps!.toStringAsFixed(1)} MB/s',
+          key: const Key('speed'),
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Pal.of(context).muted)),
+    ]);
   }
 
   /// Spinner while Windows brings the hotspot up.
