@@ -55,8 +55,21 @@ def main():
     ico = os.path.join(root, "windows", "runner", "resources", "app_icon.ico")
     m.save(ico, format="ICO", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
     stage = os.path.join(root, "windows", "sparse", "stage", "Assets")
-    for name, px in (("logo44.png", 44), ("logo50.png", 50), ("logo150.png", 150)):
+    os.makedirs(stage, exist_ok=True)
+    for f in os.listdir(stage):
+        os.remove(os.path.join(stage, f))
+
+    def save(name, px):
         m.resize((px, px), Image.LANCZOS).save(os.path.join(stage, name))
+
+    # Windows picks icons by qualified file name; give it every standard variant.
+    for scale in (100, 125, 150, 200, 400):
+        save(f"Square44x44Logo.scale-{scale}.png", round(44 * scale / 100))
+        save(f"Square150x150Logo.scale-{scale}.png", round(150 * scale / 100))
+        save(f"StoreLogo.scale-{scale}.png", round(50 * scale / 100))
+    for size in (16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256):
+        save(f"Square44x44Logo.targetsize-{size}.png", size)
+        save(f"Square44x44Logo.targetsize-{size}_altform-unplated.png", size)
     print("logo written")
 
 

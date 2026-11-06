@@ -11,7 +11,7 @@
   <Properties>
     <DisplayName>LAN Share</DisplayName>
     <PublisherDisplayName>LAN Share</PublisherDisplayName>
-    <Logo>Assets\logo50.png</Logo>
+    <Logo>Assets\StoreLogo.png</Logo>
     <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
   </Properties>
 
@@ -29,8 +29,8 @@
         DisplayName="LAN Share"
         Description="LAN Share"
         BackgroundColor="transparent"
-        Square150x150Logo="Assets\logo150.png"
-        Square44x44Logo="Assets\logo44.png" />
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
       <Extensions>
         <uap:Extension Category="windows.shareTarget">
           <uap:ShareTarget Description="LAN Share">
