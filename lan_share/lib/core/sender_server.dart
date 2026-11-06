@@ -8,6 +8,7 @@ import 'lan_address.dart';
 import 'pairing.dart';
 import 'token_store.dart';
 import 'transfer_progress.dart';
+import 'web_pages.dart';
 
 export 'transfer_progress.dart';
 
@@ -170,32 +171,20 @@ class SenderServer {
   }
 
   /// Typed-code entry for phones that cannot scan the QR.
-  Future<void> _joinPage(HttpRequest req) async {
+  Future<void> _joinPage(HttpRequest req, [JoinState state = JoinState.fresh, int code = 200]) async {
     req.response
+      ..statusCode = code
       ..headers.contentType = ContentType.html
-      ..write('<!doctype html><meta charset=utf-8>'
-          '<meta name=viewport content="width=device-width,initial-scale=1">'
-          '<title>Share</title><style>'
-          'body{margin:0;min-height:100vh;display:grid;place-items:center;'
-          'background:#0b1220;color:#f8fafc;font:16px system-ui}'
-          'form{display:flex;gap:12px;padding:16px}'
-          'input{width:9em;font-size:32px;letter-spacing:.2em;text-align:center;'
-          'padding:14px;border-radius:18px;border:2px solid #3b82f6;'
-          'background:#151e33;color:inherit}'
-          'button{width:64px;border:0;border-radius:18px;background:#22c55e;'
-          'font-size:28px;color:#04210f}</style>'
-          '<form action="/join" method="get">'
-          '<input name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" autofocus>'
-          '<button>&#x279C;</button></form>');
+      ..write(joinPage(state));
     await req.response.close();
   }
 
   Future<void> _join(HttpRequest req) async {
-    if (_badCodes >= 5) return _reply(req, 429);
+    if (_badCodes >= 5) return _joinPage(req, JoinState.locked, 429);
     final code = req.uri.queryParameters['code'] ?? '';
     if (!codesMatch(accessCode, code)) {
       _badCodes++;
-      return _reply(req, 403);
+      return _joinPage(req, JoinState.wrong, 403);
     }
     req.response.statusCode = HttpStatus.found;
     req.response.headers.set('location', '/$_token');
@@ -245,26 +234,10 @@ class SenderServer {
     await req.response.close();
   }
 
-  String _page(List<Map<String, Object>> list) {
-    final esc = const HtmlEscape(HtmlEscapeMode.attribute);
-    final rows = list.map((f) {
-      final mb = ((f['size'] as int) / 1048576).toStringAsFixed(1);
-      return '<a class="f" href="${esc.convert(f['url'] as String)}" download>'
-          '<span class="i">&#x2B07;</span>'
-          '<span class="n">${esc.convert(f['name'] as String)}</span>'
-          '<span class="s">$mb MB</span></a>';
-    }).join();
-    return '<!doctype html><meta charset=utf-8>'
-        '<meta name=viewport content="width=device-width,initial-scale=1">'
-        '<title>Share</title><style>'
-        'body{margin:0;padding:16px;font:16px system-ui;background:#0f172a;color:#f8fafc}'
-        '.f{display:flex;align-items:center;gap:12px;padding:16px;margin-bottom:12px;'
-        'border-radius:16px;background:#1e293b;color:inherit;text-decoration:none}'
-        '.i{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;'
-        'background:#22c55e;color:#04210f;font-size:20px}'
-        '.n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
-        '.s{opacity:.6;font-size:13px}</style>$rows';
-  }
+  String _page(List<Map<String, Object>> list) => downloadPage([
+        for (final f in list)
+          WebFile(f['name'] as String, f['size'] as int, f['url'] as String)
+      ]);
 
   Future<void> _file(HttpRequest req, int i) async {
     final f = files[i];
