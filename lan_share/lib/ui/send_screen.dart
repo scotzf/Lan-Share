@@ -3,7 +3,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'package:path_provider/path_provider.dart';
+
 import '../core/discovery.dart';
+import '../core/identity.dart';
 import '../core/sender_server.dart';
 import '../core/token_store.dart';
 import 'send_view.dart';
@@ -42,7 +45,8 @@ class _SendScreenState extends State<SendScreen> {
       _link = null;
     });
     try {
-      final server = SenderServer(widget.files, TokenStore());
+      final identity = await loadOrCreateIdentity(await getApplicationSupportDirectory());
+      final server = SenderServer(widget.files, TokenStore(), identity: identity);
       final link = await server.start();
       _server = server;
       _subs.add(server.progress.listen(_onProgress));

@@ -25,7 +25,7 @@ void main() {
   test('receive writes files to dest only', () async {
     final a = File('${src.path}/a b 写.txt')..writeAsStringSync('AAA');
     final (_, link) = await sender([a]);
-    await ReceiverClient().receive(link, dest);
+    await ReceiverClient(allowInsecure: true).receive(link, dest);
     expect(File('${dest.path}/a b 写.txt').readAsStringSync(), 'AAA');
     expect(dest.listSync().length, 1);
   });
@@ -35,7 +35,7 @@ void main() {
     final a = File('${src.path}/d.txt')..writeAsStringSync('1');
     final b = File('${sub.path}/d.txt')..writeAsStringSync('2');
     final (_, link) = await sender([a, b]);
-    await ReceiverClient().receive(link, dest);
+    await ReceiverClient(allowInsecure: true).receive(link, dest);
     expect(File('${dest.path}/d.txt').readAsStringSync(), '1');
     expect(File('${dest.path}/d (2).txt').readAsStringSync(), '2');
   });
@@ -44,7 +44,7 @@ void main() {
     final a = File('${src.path}/a.txt')..writeAsStringSync('x');
     final (_, link) = await sender([a], code: '1234');
     await expectLater(
-        ReceiverClient().receive(link, dest, pairingCode: '9999'),
+        ReceiverClient(allowInsecure: true).receive(link, dest, pairingCode: '9999'),
         throwsA(isA<TransferException>()));
     expect(dest.listSync(), isEmpty);
   });
@@ -52,7 +52,7 @@ void main() {
   test('right pairing code succeeds', () async {
     final a = File('${src.path}/a.txt')..writeAsStringSync('x');
     final (_, link) = await sender([a], code: '1234');
-    await ReceiverClient().receive(link, dest, pairingCode: '1234');
+    await ReceiverClient(allowInsecure: true).receive(link, dest, pairingCode: '1234');
     expect(File('${dest.path}/a.txt').existsSync(), isTrue);
   });
 }

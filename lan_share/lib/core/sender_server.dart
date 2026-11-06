@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'identity.dart';
 import 'lan_address.dart';
 import 'pairing.dart';
 import 'token_store.dart';
@@ -24,7 +25,7 @@ class SenderServer {
     this.idle = const Duration(minutes: 5),
     this.bindAddress,
     this.preferredPort,
-    this.securityContext,
+    this.identity,
     this.pairingCode,
   });
 
@@ -33,7 +34,7 @@ class SenderServer {
   final Duration idle;
   final InternetAddress? bindAddress;
   final int? preferredPort;
-  final SecurityContext? securityContext;
+  final Identity? identity;
   final String? pairingCode;
 
   HttpServer? _server;
@@ -66,14 +67,16 @@ class SenderServer {
     _server!.listen(_handle);
     _token = tokens.issue();
     _resetIdle();
-    final scheme = securityContext == null ? 'http' : 'https';
-    return Uri.parse('$scheme://${addr.address}:${_server!.port}/$_token');
+    final base = '${addr.address}:${_server!.port}/$_token';
+    return identity == null
+        ? Uri.parse('http://$base')
+        : Uri.parse('https://$base?fp=${identity!.fingerprint}');
   }
 
   Future<HttpServer> _bind(InternetAddress addr) async {
-    Future<HttpServer> b(int port) => securityContext == null
+    Future<HttpServer> b(int port) => identity == null
         ? HttpServer.bind(addr, port)
-        : HttpServer.bindSecure(addr, port, securityContext!);
+        : HttpServer.bindSecure(addr, port, identity!.context);
     if (preferredPort != null) {
       try {
         return await b(preferredPort!);
@@ -126,7 +129,7 @@ class SenderServer {
     Map<String, Object?> body;
     if (seg.length == 1) {
       final id = _randomId();
-      final code = newPairingCode();
+      final code = identity == null ? newPairingCode() : sasCode(identity!.der, id);
       _pairStatus[id] = 'pending';
       _pairReq.add(PairRequest(id, code));
       body = {'id': id, 'code': code};

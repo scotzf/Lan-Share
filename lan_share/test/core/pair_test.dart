@@ -62,14 +62,14 @@ void receiverPairTests() {
     addTearDown(s.stop);
     final u = await s.start();
     s.pairRequests.listen((r) => s.approve(r.id));
-    final session = await ReceiverClient().requestPair(u.host, u.port,
+    final session = await ReceiverClient(allowInsecure: true).requestPair(u.host, u.port, secure: false,
         poll: const Duration(milliseconds: 20));
     expect(session.code, matches(RegExp(r'^\d{4}$')));
     final link = await session.approval;
     expect(link, isNotNull);
     final dest = Directory.systemTemp.createTempSync('rpd_');
     addTearDown(() => dest.deleteSync(recursive: true));
-    await ReceiverClient().receive(link!, dest);
+    await ReceiverClient(allowInsecure: true).receive(link!, dest);
     expect(File('${dest.path}/a.txt').readAsStringSync(), 'hi');
   });
 }
