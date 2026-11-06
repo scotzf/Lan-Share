@@ -62,7 +62,11 @@ def main():
     def save(name, px):
         m.resize((px, px), Image.LANCZOS).save(os.path.join(stage, name))
 
-    # Windows picks icons by qualified file name; give it every standard variant.
+    # Without a resource index Windows opens the exact name in the manifest.
+    save("Square44x44Logo.png", 44)
+    save("Square150x150Logo.png", 150)
+    save("StoreLogo.png", 50)
+    # With one it picks by qualified name; give it every standard variant.
     for scale in (100, 125, 150, 200, 400):
         save(f"Square44x44Logo.scale-{scale}.png", round(44 * scale / 100))
         save(f"Square150x150Logo.scale-{scale}.png", round(150 * scale / 100))
