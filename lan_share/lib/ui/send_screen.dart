@@ -10,20 +10,31 @@ import '../core/hotspot.dart';
 import '../core/hotspot_runner.dart';
 import '../core/identity.dart';
 import '../core/lan_address.dart';
+import '../core/qr_payload.dart';
 import '../core/sender_server.dart';
+import '../core/settings.dart';
 import '../core/token_store.dart';
 import 'send_view.dart';
 import 'transfer_ring.dart';
 
 class SendScreen extends StatefulWidget {
-  const SendScreen({super.key, required this.files, this.closeApp = false, this.hotspotRunner});
+  const SendScreen({
+    super.key,
+    required this.files,
+    this.closeApp = false,
+    this.hotspotRunner,
+    this.settings,
+  });
   final List<File> files;
+
+  /// Started from the Windows share menu: closing ends the app.
+  final bool closeApp;
 
   /// Runs the hotspot script; tests swap it to fake a joined phone.
   final ScriptRunner? hotspotRunner;
 
-  /// Started from the Windows share menu: closing ends the app.
-  final bool closeApp;
+  /// Tests pass their own settings; they are then not saved to disk.
+  final Settings? settings;
 
   @override
   State<SendScreen> createState() => _SendScreenState();
@@ -47,8 +58,11 @@ class _SendScreenState extends State<SendScreen> {
   bool _manual = false;
 
   late final Hotspot _hotspot;
-  HotspotUi _hsUi = HotspotUi.off;
-  HotspotInfo? _hsInfo;
+  late Settings _settings;
+  Directory? _supportDir;
+  HotspotInfo? _hsInfo; // set while the hotspot is up
+  bool _hsBusy = false; // hotspot starting in the background
+  bool _joinView = false; // showing the Wi-Fi join QR instead of the link QR
   Timer? _hsPoll;
   bool _polling = false;
   AppLifecycleListener? _lifecycle;
@@ -57,12 +71,28 @@ class _SendScreenState extends State<SendScreen> {
   void initState() {
     super.initState();
     _hotspot = Hotspot(widget.hotspotRunner ?? powershellRunner);
+    _settings = widget.settings ?? Settings();
     // closing the window must not leave the hotspot on
     _lifecycle = AppLifecycleListener(onExitRequested: () async {
       await _hotspot.stop();
       return AppExitResponse.exit;
     });
-    _start();
+    _init();
+  }
+
+  Future<void> _init() async {
+    _supportDir = await getApplicationSupportDirectory();
+    if (widget.settings == null) _settings = await Settings.load(_supportDir!);
+    await _start();
+    // hotspot assist: the Android app can join it when the phone is not on this Wi-Fi
+    if (mounted && _settings.hotspotAssist && Platform.isWindows && _phase == Phase.waiting) {
+      unawaited(_beginHotspot());
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    if (widget.settings != null || _supportDir == null) return;
+    await _settings.save(_supportDir!);
   }
 
   Future<void> _start() async {
@@ -77,20 +107,15 @@ class _SendScreenState extends State<SendScreen> {
       _link = null;
       _manual = false;
     });
-    final onHotspot = _hsInfo != null;
     // No Wi-Fi or LAN: a QR pointing at this machine alone would be useless.
-    if (!onHotspot && (await pickLanAddress()).isLoopback) {
+    if (_hsInfo == null && (await pickLanAddress()).isLoopback) {
       if (mounted) setState(() => _phase = Phase.offline);
       return;
     }
     try {
       final identity = await loadOrCreateIdentity(await getApplicationSupportDirectory());
-      final server = SenderServer(
-        widget.files,
-        TokenStore(),
-        identity: identity,
-        bindAddress: onHotspot ? InternetAddress(_hsInfo!.ip) : null,
-      );
+      // listens on every network, so the same QR works on the home Wi-Fi and on the hotspot
+      final server = SenderServer(widget.files, TokenStore(), identity: identity, bindAll: true);
       final link = await server.start();
       _server = server;
       _subs.add(server.progress.listen(_onProgress));
@@ -149,57 +174,75 @@ class _SendScreenState extends State<SendScreen> {
 
   // --- hotspot -----------------------------------------------------------
 
-  Future<void> _toggleHotspot() async {
-    if (_hsUi != HotspotUi.off) return _stopHotspot();
-    setState(() {
-      _hsUi = HotspotUi.starting;
-      _manual = false;
-    });
+  /// Starts the hotspot quietly: the QR stays on screen and gains the join hint when it is up.
+  Future<void> _beginHotspot({bool manual = false}) async {
+    if (_hsInfo != null || _hsBusy) return;
+    setState(() => _hsBusy = true);
     try {
       final info = await _hotspot.start();
       if (!mounted) {
         await _hotspot.stop();
         return;
       }
-      _hsInfo = info;
-      // the server must listen on the hotspot address; the address can lag a moment
-      for (var i = 0; i < 6; i++) {
-        await _start();
-        if (!mounted) return;
-        if (_phase != Phase.failed) break;
-        await Future<void>.delayed(const Duration(seconds: 1));
-      }
-      if (_phase == Phase.failed) {
-        _hsInfo = null;
-        setState(() => _hsUi = HotspotUi.off);
-        await _hotspot.stop(); // never leave the hotspot on after a failure
+      if (_phase == Phase.done || _phase == Phase.expired) {
+        await _hotspot.stop(); // the share ended while the hotspot was starting
+        setState(() => _hsBusy = false);
         return;
       }
-      setState(() => _hsUi = HotspotUi.joining);
-      _pollClients();
+      setState(() {
+        _hsInfo = info;
+        _hsBusy = false;
+      });
     } on HotspotException catch (e) {
       if (!mounted) return;
-      _hsInfo = null;
       setState(() {
-        _hsUi = HotspotUi.off;
-        final noNet = e.reason.startsWith('offline') || e.reason.startsWith('unavailable');
-        _phase = noNet ? Phase.offline : Phase.failed;
+        _hsBusy = false;
+        // a background start that fails stays silent; the LAN QR still works
+        if (manual && (e.reason.startsWith('offline') || e.reason.startsWith('unavailable'))) {
+          _phase = Phase.offline;
+        }
       });
     }
   }
 
-  /// Watches for the phone joining, then switches from the Wi-Fi QR to the download QR.
+  /// The hotspot button: turns it on or off, and remembers the choice.
+  Future<void> _toggleHotspot() async {
+    if (_hsInfo != null) {
+      _settings.hotspotAssist = false;
+      unawaited(_saveSettings());
+      await _stopHotspot();
+    } else {
+      _settings.hotspotAssist = true;
+      unawaited(_saveSettings());
+      await _beginHotspot(manual: true);
+    }
+  }
+
+  /// Swaps the link QR for the Wi-Fi join QR (for a browser phone that is not on the LAN).
+  void _toggleJoin() {
+    setState(() {
+      _joinView = !_joinView;
+      _manual = false;
+    });
+    if (_joinView) {
+      _pollClients();
+    } else {
+      _hsPoll?.cancel();
+    }
+  }
+
+  /// While the join QR shows, switch back to the link QR once a phone has joined.
   void _pollClients() {
     _hsPoll?.cancel();
     _hsPoll = Timer.periodic(const Duration(milliseconds: 1500), (t) async {
       if (_polling) return;
-      if (!mounted || _hsUi != HotspotUi.joining) return t.cancel();
+      if (!mounted || !_joinView) return t.cancel();
       _polling = true;
       final n = await _hotspot.clients();
       _polling = false;
-      if (n > 0 && mounted && _hsUi == HotspotUi.joining) {
+      if (n > 0 && mounted && _joinView) {
         t.cancel();
-        setState(() => _hsUi = HotspotUi.ready);
+        setState(() => _joinView = false);
       }
     });
   }
@@ -207,19 +250,19 @@ class _SendScreenState extends State<SendScreen> {
   /// Turn the hotspot off for good: transfer finished or the code expired.
   void _releaseHotspot() {
     _hsPoll?.cancel();
-    if (_hsUi == HotspotUi.off) return;
-    _hsUi = HotspotUi.off;
+    if (_hsInfo == null) return;
     _hsInfo = null;
+    _joinView = false;
     unawaited(_hotspot.stop());
   }
 
-  /// User switched the hotspot off: back to the normal Wi-Fi QR.
   Future<void> _stopHotspot() async {
     _hsPoll?.cancel();
-    setState(() => _hsUi = HotspotUi.off);
-    _hsInfo = null;
+    setState(() {
+      _hsInfo = null;
+      _joinView = false;
+    });
     await _hotspot.stop();
-    if (mounted && _phase == Phase.waiting) await _start();
   }
 
   // -----------------------------------------------------------------------
@@ -255,36 +298,42 @@ class _SendScreenState extends State<SendScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        body: SendView(
-          phase: _phase,
-          link: _link,
-          fileCount: widget.files.length,
-          fileNames: [for (final f in widget.files) f.uri.pathSegments.last],
-          remaining: _remaining,
-          fraction: _fraction,
-          speedMBps: _speed,
-          pairCode: _pair?.code,
-          accessCode: _server?.accessCode,
-          manualAddress: _server?.shortAddress,
-          showManual: _manual,
-          hotspot: _hsUi,
-          wifiQr: _hsInfo == null ? null : wifiQrString(_hsInfo!.ssid, _hsInfo!.pass),
-          hotspotName: _hsInfo?.ssid,
-          hotspotPass: _hsInfo?.pass,
-          onToggleHotspot: Platform.isWindows ? _toggleHotspot : null,
-          onToggleManual: () => setState(() => _manual = !_manual),
-          onApprove: () {
-            _server?.approve(_pair!.id);
-            setState(() => _pair = null);
-          },
-          onDeny: () {
-            _server?.deny(_pair!.id);
-            setState(() => _pair = null);
-          },
-          onRefresh: _start,
-          onRetry: _start,
-          onClose: _close,
-        ),
-      );
+  Widget build(BuildContext context) {
+    final up = _hsInfo != null;
+    return Scaffold(
+      body: SendView(
+        phase: _phase,
+        link: _link,
+        fileCount: widget.files.length,
+        fileNames: [for (final f in widget.files) f.uri.pathSegments.last],
+        remaining: _remaining,
+        fraction: _fraction,
+        speedMBps: _speed,
+        pairCode: _pair?.code,
+        accessCode: _server?.accessCode,
+        manualAddress: _server?.shortAddress,
+        showManual: _manual,
+        hotspot: !up ? HotspotUi.off : (_joinView ? HotspotUi.joining : HotspotUi.ready),
+        hotspotBusy: _hsBusy,
+        qrData: up && _link != null ? qrPayload(_link!, hotspot: _hsInfo) : null,
+        wifiQr: up ? wifiQrString(_hsInfo!.ssid, _hsInfo!.pass) : null,
+        hotspotName: _hsInfo?.ssid,
+        hotspotPass: _hsInfo?.pass,
+        onToggleHotspot: Platform.isWindows ? _toggleHotspot : null,
+        onToggleJoin: up ? _toggleJoin : null,
+        onToggleManual: () => setState(() => _manual = !_manual),
+        onApprove: () {
+          _server?.approve(_pair!.id);
+          setState(() => _pair = null);
+        },
+        onDeny: () {
+          _server?.deny(_pair!.id);
+          setState(() => _pair = null);
+        },
+        onRefresh: _start,
+        onRetry: _start,
+        onClose: _close,
+      ),
+    );
+  }
 }

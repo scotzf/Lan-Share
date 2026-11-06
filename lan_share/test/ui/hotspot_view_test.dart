@@ -29,6 +29,7 @@ SendView view({
     );
 
 void main() {
+  assistTests();
   testWidgets('off: Hotspot button shown and tappable', (t) async {
     var taps = 0;
     await t.pumpWidget(host(view(toggle: () => taps++)));
@@ -87,5 +88,52 @@ void main() {
         }
       }
     }
+  });
+}
+
+void assistTests() {
+  testWidgets('assist starting in the background keeps the QR visible and the button busy', (t) async {
+    await t.pumpWidget(host(SendView(
+      phase: Phase.waiting, link: link, fileCount: 1, accessCode: '123456',
+      hotspotBusy: true, onToggleHotspot: () {}, onToggleManual: () {},
+    )));
+    await t.pump(const Duration(milliseconds: 600));
+    expect(find.byKey(const Key('qr')), findsOneWidget, reason: 'LAN users can scan straight away');
+    final b = t.widget<TextButton>(find.byKey(const Key('hotspot')));
+    expect(b.onPressed, isNull);
+  });
+
+  testWidgets('the QR shows the payload given, not just the link', (t) async {
+    await t.pumpWidget(host(SendView(
+      phase: Phase.waiting, link: link, fileCount: 1, accessCode: '123456',
+      hotspot: HotspotUi.ready, qrData: '${link.toString()}#hs=x&hp=y&hip=192.168.137.1',
+      onToggleHotspot: () {}, onToggleManual: () {},
+    )));
+    await t.pump(const Duration(milliseconds: 600));
+    expect(t.widget<QrBox>(find.byType(QrBox)).data, endsWith('#hs=x&hp=y&hip=192.168.137.1'));
+  });
+
+  testWidgets('Wi-Fi button appears while the hotspot is up and swaps views', (t) async {
+    var taps = 0;
+    await t.pumpWidget(host(SendView(
+      phase: Phase.waiting, link: link, fileCount: 1, accessCode: '123456',
+      hotspot: HotspotUi.ready, wifiQr: wifi, onToggleHotspot: () {}, onToggleJoin: () => taps++,
+      onToggleManual: () {},
+    )));
+    expect(find.text('Wi-Fi'), findsOneWidget);
+    await t.tap(find.byKey(const Key('wifiToggle')));
+    expect(taps, 1);
+    await t.pumpWidget(host(SendView(
+      phase: Phase.waiting, link: link, fileCount: 1, accessCode: '123456',
+      hotspot: HotspotUi.joining, wifiQr: wifi, onToggleHotspot: () {}, onToggleJoin: () {},
+      onToggleManual: () {},
+    )));
+    expect(find.text('Link'), findsOneWidget);
+    // and it is hidden when the hotspot is off
+    await t.pumpWidget(host(SendView(
+      phase: Phase.waiting, link: link, fileCount: 1, accessCode: '123456',
+      onToggleHotspot: () {}, onToggleJoin: () {}, onToggleManual: () {},
+    )));
+    expect(find.byKey(const Key('wifiToggle')), findsNothing);
   });
 }

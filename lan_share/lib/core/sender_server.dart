@@ -29,6 +29,7 @@ class SenderServer {
     this.identity,
     this.pairingCode,
     this.httpRedirectPort = 80,
+    this.bindAll = false,
   });
 
   final List<File> files;
@@ -42,6 +43,10 @@ class SenderServer {
   /// Plain-http port that bounces to the secure code page, so a typed
   /// address works. 80 means the browser default; 0 picks any free port.
   final int httpRedirectPort;
+
+  /// Listen on every network interface (home Wi-Fi, hotspot, ...) while the
+  /// link and the typed address still show [bindAddress] / the LAN address.
+  final bool bindAll;
 
   HttpServer? _server;
   HttpServer? _redirect;
@@ -82,10 +87,11 @@ class SenderServer {
 
   Future<Uri> start() async {
     final addr = bindAddress ?? await pickLanAddress();
-    _server = await _bind(addr);
+    final listenOn = bindAll ? InternetAddress.anyIPv4 : addr;
+    _server = await _bind(listenOn);
     _server!.listen(_handle);
     _addr = addr;
-    if (identity != null) await _startRedirect(addr);
+    if (identity != null) await _startRedirect(listenOn);
     _token = tokens.issue();
     _resetIdle();
     final base = '${addr.address}:${_server!.port}/$_token';
@@ -104,7 +110,9 @@ class SenderServer {
     _redirect!.listen((req) async {
       _resetIdle();
       req.response.statusCode = HttpStatus.found;
-      req.response.headers.set('location', 'https://${addr.address}:${_server?.port}/');
+      // the address the phone typed (home Wi-Fi or hotspot), so it works on either network
+      final host = req.headers.host ?? _addr!.address;
+      req.response.headers.set('location', 'https://$host:${_server?.port}/');
       await req.response.close();
     });
   }
@@ -163,6 +171,7 @@ class SenderServer {
     final seg = req.uri.pathSegments;
     try {
       if (seg.isEmpty || (seg.length == 1 && seg[0].isEmpty)) return await _joinPage(req);
+      if (seg.length == 1 && seg[0] == 'ping') return await _reply(req, 204);
       if (seg.length == 1 && seg[0] == 'join') return await _join(req);
       if (seg.isNotEmpty && seg[0] == 'pair') return await _pair(req, seg);
       if (seg.length == 1 && seg[0].isNotEmpty) {

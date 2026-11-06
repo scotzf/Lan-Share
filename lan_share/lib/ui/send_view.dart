@@ -33,10 +33,13 @@ class SendView extends StatelessWidget {
     this.manualAddress,
     this.showManual = false,
     this.hotspot = HotspotUi.off,
+    this.hotspotBusy = false,
+    this.qrData,
     this.wifiQr,
     this.hotspotName,
     this.hotspotPass,
     this.onToggleHotspot,
+    this.onToggleJoin,
     this.onToggleManual,
     this.onApprove,
     this.onDeny,
@@ -67,8 +70,16 @@ class SendView extends StatelessWidget {
 
   /// Hotspot flow: the join-Wi-Fi QR payload and the credentials to type.
   final HotspotUi hotspot;
+
+  /// The hotspot is starting quietly in the background; the QR stays usable.
+  final bool hotspotBusy;
+
+  /// Text for the link QR (the link, plus the hotspot hint when it is up).
+  final String? qrData;
   final String? wifiQr, hotspotName, hotspotPass;
-  final VoidCallback? onToggleHotspot;
+
+  /// Hotspot on/off, and swapping between the link QR and the Wi-Fi join QR.
+  final VoidCallback? onToggleHotspot, onToggleJoin;
   final VoidCallback? onToggleManual, onApprove, onDeny, onRefresh, onRetry, onClose;
 
   bool get _hotspotOn => hotspot == HotspotUi.starting || hotspot == HotspotUi.joining || hotspot == HotspotUi.ready;
@@ -122,9 +133,18 @@ class SendView extends StatelessWidget {
         if (spot)
           TextButton.icon(
             key: const Key('hotspot'),
-            onPressed: hotspot == HotspotUi.starting ? null : onToggleHotspot,
-            icon: Icon(_hotspotOn ? Icons.wifi_tethering_off : Icons.wifi_tethering, size: 20),
+            onPressed: hotspot == HotspotUi.starting || hotspotBusy ? null : onToggleHotspot,
+            icon: hotspotBusy
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.4))
+                : Icon(_hotspotOn ? Icons.wifi_tethering_off : Icons.wifi_tethering, size: 20),
             label: Text(_hotspotOn ? 'Stop' : 'Hotspot', style: style),
+          ),
+        if (spot && onToggleJoin != null && (hotspot == HotspotUi.ready || hotspot == HotspotUi.joining))
+          TextButton.icon(
+            key: const Key('wifiToggle'),
+            onPressed: onToggleJoin,
+            icon: Icon(hotspot == HotspotUi.joining ? Icons.qr_code_2 : Icons.wifi_rounded, size: 20),
+            label: Text(hotspot == HotspotUi.joining ? 'Link' : 'Wi-Fi', style: style),
           ),
       ]),
     );
@@ -226,7 +246,7 @@ class SendView extends StatelessWidget {
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [BoxShadow(color: color.withValues(alpha: .5), blurRadius: 44)],
               ),
-              child: QrBox(link.toString()),
+              child: QrBox(qrData ?? link.toString()),
             ),
           ),
         ),
