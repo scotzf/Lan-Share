@@ -10,6 +10,12 @@ import 'transfer_progress.dart';
 
 export 'transfer_progress.dart';
 
+class PairRequest {
+  const PairRequest(this.id, this.code);
+  final String id;
+  final String code;
+}
+
 /// Temporary server that serves only the chosen files, once.
 class SenderServer {
   SenderServer(
@@ -36,6 +42,21 @@ class SenderServer {
   String? _token;
   final Set<int> _finished = {};
   final _progress = StreamController<TransferProgress>.broadcast();
+  final _pairReq = StreamController<PairRequest>.broadcast();
+  final Map<String, String> _pairStatus = {};
+  final Map<String, String> _pairLink = {};
+
+  Stream<PairRequest> get pairRequests => _pairReq.stream;
+
+  void approve(String id) {
+    if (_pairStatus[id] != 'pending') return;
+    _pairStatus[id] = 'approved';
+    _pairLink[id] = '/${tokens.issue()}';
+  }
+
+  void deny(String id) {
+    if (_pairStatus[id] == 'pending') _pairStatus[id] = 'denied';
+  }
 
   Stream<TransferProgress> get progress => _progress.stream;
 
@@ -79,6 +100,7 @@ class SenderServer {
     _resetIdle();
     final seg = req.uri.pathSegments;
     try {
+      if (seg.isNotEmpty && seg[0] == 'pair') return _pair(req, seg);
       if (seg.length == 1 && seg[0].isNotEmpty) {
         final want = pairingCode;
         if (want != null &&
@@ -98,6 +120,26 @@ class SenderServer {
     } catch (_) {
       return _reply(req, 500);
     }
+  }
+
+  Future<void> _pair(HttpRequest req, List<String> seg) async {
+    Map<String, Object?> body;
+    if (seg.length == 1) {
+      final id = _randomId();
+      final code = newPairingCode();
+      _pairStatus[id] = 'pending';
+      _pairReq.add(PairRequest(id, code));
+      body = {'id': id, 'code': code};
+    } else if (seg.length == 2 && _pairStatus.containsKey(seg[1])) {
+      final id = seg[1];
+      body = {'status': _pairStatus[id], 'link': _pairLink[id]};
+    } else {
+      return _reply(req, 404);
+    }
+    req.response
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode(body));
+    await req.response.close();
   }
 
   Future<void> _manifest(HttpRequest req) async {

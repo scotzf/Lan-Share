@@ -12,9 +12,47 @@ class TransferException implements Exception {
   String toString() => 'TransferException: $message';
 }
 
+class PairSession {
+  PairSession(this.code, this.approval);
+  final String code;
+
+  /// Resolves to the download link once approved; null if denied.
+  final Future<Uri?> approval;
+}
+
 class ReceiverClient {
   final _progress = StreamController<TransferProgress>.broadcast();
   Stream<TransferProgress> get progress => _progress.stream;
+
+  Future<PairSession> requestPair(String host, int port,
+      {Duration poll = const Duration(milliseconds: 500)}) async {
+    final base = Uri(scheme: 'http', host: host, port: port);
+    Future<Map> getJson(Uri u) async {
+      final c = HttpClient();
+      try {
+        final r = await (await c.getUrl(u)).close();
+        return jsonDecode(await utf8.decodeStream(r)) as Map;
+      } finally {
+        c.close();
+      }
+    }
+
+    final created = await getJson(base.resolve('/pair'));
+    final id = created['id'] as String;
+    Future<Uri?> wait() async {
+      for (var i = 0; i < 240; i++) {
+        final st = await getJson(base.resolve('/pair/$id'));
+        if (st['status'] == 'approved') {
+          return base.resolve(st['link'] as String);
+        }
+        if (st['status'] == 'denied') return null;
+        await Future<void>.delayed(poll);
+      }
+      return null;
+    }
+
+    return PairSession(created['code'] as String, wait());
+  }
 
   Future<void> receive(Uri link, Directory dest, {String? pairingCode}) async {
     final client = HttpClient()..badCertificateCallback = (_, __, ___) => true;
