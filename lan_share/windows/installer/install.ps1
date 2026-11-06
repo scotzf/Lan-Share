@@ -1,9 +1,9 @@
-# Installs the release build to a fixed folder and points both Windows menu entries at it.
+# Installs the app build to a fixed folder and points both Windows menu entries at it.
 # Needs: windows\sparse\lanshare.msix built, and its certificate trusted (see windows\sparse).
 # Uses the Debug build by default: Smart App Control blocked a fresh unsigned Release build
 # on this PC but allows Debug builds. Pass -Source ...\Release if your PC allows it.
 param(
-  [string]$Source = (Join-Path $PSScriptRoot '..\..\build\windows\x64\runner\Release'),
+  [string]$Source = (Join-Path $PSScriptRoot '..\..\build\windows\x64\runner\Debug'),
   [string]$Target = (Join-Path $env:LOCALAPPDATA 'Programs\LANShare')
 )
 $ErrorActionPreference = 'Stop'
