@@ -17,6 +17,9 @@ class SendView extends StatelessWidget {
     this.fraction = 0,
     this.remaining = 1,
     this.pairCode,
+    this.accessCode,
+    this.showManual = false,
+    this.onToggleManual,
     this.onApprove,
     this.onDeny,
     this.onRefresh,
@@ -33,7 +36,11 @@ class SendView extends StatelessWidget {
   /// Life left on the QR code, 1 -> 0.
   final double remaining;
   final String? pairCode;
-  final VoidCallback? onApprove, onDeny, onRefresh, onRetry, onClose;
+
+  /// 6-digit code for phones that cannot scan; shown with the address.
+  final String? accessCode;
+  final bool showManual;
+  final VoidCallback? onToggleManual, onApprove, onDeny, onRefresh, onRetry, onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -44,14 +51,20 @@ class SendView extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: IconButton.filledTonal(
+            Row(children: [
+              IconButton.filledTonal(
                 key: const Key('close'),
                 onPressed: onClose,
                 icon: const Icon(Icons.close),
               ),
-            ),
+              const Spacer(),
+              if (phase == Phase.waiting && link != null && pairCode == null && accessCode != null)
+                IconButton.filledTonal(
+                  key: const Key('manual'),
+                  onPressed: onToggleManual,
+                  icon: Icon(showManual ? Icons.qr_code_2 : Icons.dialpad),
+                ),
+            ]),
             Expanded(child: Center(child: _hero(color))),
             FileChips(names: fileNames, count: fileCount, color: color),
             const SizedBox(height: 16),
@@ -64,6 +77,9 @@ class SendView extends StatelessWidget {
 
   Widget _hero(Color color) {
     if (pairCode != null) return _pairing();
+    if (showManual && phase == Phase.waiting && link != null && accessCode != null) {
+      return _manual();
+    }
     if (phase == Phase.waiting && link != null) {
       final urgent = remaining < .2;
       final arcColor = urgent ? C.amber : C.blue;
@@ -100,6 +116,39 @@ class SendView extends StatelessWidget {
       );
     }
     return TransferRing(phase: phase, fraction: fraction, size: 230);
+  }
+
+  Widget _manual() {
+    final c = accessCode!;
+    final grouped = '${c.substring(0, 3)} ${c.substring(3)}';
+    Widget tile(IconData icon, Color color, Widget child) => Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          decoration: BoxDecoration(
+            color: C.card,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [BoxShadow(color: color.withValues(alpha: .3), blurRadius: 30)],
+          ),
+          child: Row(children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(color: color.withValues(alpha: .25), shape: BoxShape.circle),
+              child: Icon(icon, color: color),
+            ),
+            const SizedBox(width: 16),
+            Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: child)),
+          ]),
+        );
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      tile(Icons.language, C.blue,
+          Text(link!.authority, key: const Key('manualAddress'),
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700))),
+      const SizedBox(height: 20),
+      tile(Icons.pin_outlined, C.green,
+          Text(grouped, key: const Key('manualCode'),
+              style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w800, letterSpacing: 6))),
+    ]);
   }
 
   Widget _pairing() => Column(mainAxisSize: MainAxisSize.min, children: [

@@ -35,6 +35,7 @@ class _SendScreenState extends State<SendScreen> {
   Phase _phase = Phase.waiting;
   double _fraction = 0;
   PairRequest? _pair;
+  bool _manual = false;
 
   @override
   void initState() {
@@ -49,6 +50,7 @@ class _SendScreenState extends State<SendScreen> {
       _fraction = 0;
       _pair = null;
       _link = null;
+      _manual = false;
     });
     try {
       final identity = await loadOrCreateIdentity(await getApplicationSupportDirectory());
@@ -133,6 +135,9 @@ class _SendScreenState extends State<SendScreen> {
           remaining: _remaining,
           fraction: _fraction,
           pairCode: _pair?.code,
+          accessCode: _server?.accessCode,
+          showManual: _manual,
+          onToggleManual: () => setState(() => _manual = !_manual),
           onApprove: () {
             _server?.approve(_pair!.id);
             setState(() => _pair = null);

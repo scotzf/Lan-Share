@@ -41,6 +41,9 @@ class SenderServer {
   Timer? _idleTimer;
   String? _session;
   String? _token;
+  final String accessCode =
+      (Random.secure().nextInt(900000) + 100000).toString();
+  int _badCodes = 0;
   final Set<int> _finished = {};
   final _progress = StreamController<TransferProgress>.broadcast();
   final _pairReq = StreamController<PairRequest>.broadcast();
@@ -103,6 +106,8 @@ class SenderServer {
     _resetIdle();
     final seg = req.uri.pathSegments;
     try {
+      if (seg.isEmpty || (seg.length == 1 && seg[0].isEmpty)) return _joinPage(req);
+      if (seg.length == 1 && seg[0] == 'join') return _join(req);
       if (seg.isNotEmpty && seg[0] == 'pair') return _pair(req, seg);
       if (seg.length == 1 && seg[0].isNotEmpty) {
         final want = pairingCode;
@@ -123,6 +128,39 @@ class SenderServer {
     } catch (_) {
       return _reply(req, 500);
     }
+  }
+
+  /// Typed-code entry for phones that cannot scan the QR.
+  Future<void> _joinPage(HttpRequest req) async {
+    req.response
+      ..headers.contentType = ContentType.html
+      ..write('<!doctype html><meta charset=utf-8>'
+          '<meta name=viewport content="width=device-width,initial-scale=1">'
+          '<title>Share</title><style>'
+          'body{margin:0;min-height:100vh;display:grid;place-items:center;'
+          'background:#0b1220;color:#f8fafc;font:16px system-ui}'
+          'form{display:flex;gap:12px;padding:16px}'
+          'input{width:9em;font-size:32px;letter-spacing:.2em;text-align:center;'
+          'padding:14px;border-radius:18px;border:2px solid #3b82f6;'
+          'background:#151e33;color:inherit}'
+          'button{width:64px;border:0;border-radius:18px;background:#22c55e;'
+          'font-size:28px;color:#04210f}</style>'
+          '<form action="/join" method="get">'
+          '<input name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" autofocus>'
+          '<button>&#x279C;</button></form>');
+    await req.response.close();
+  }
+
+  Future<void> _join(HttpRequest req) async {
+    if (_badCodes >= 5) return _reply(req, 429);
+    final code = req.uri.queryParameters['code'] ?? '';
+    if (!codesMatch(accessCode, code)) {
+      _badCodes++;
+      return _reply(req, 403);
+    }
+    req.response.statusCode = HttpStatus.found;
+    req.response.headers.set('location', '/$_token');
+    await req.response.close();
   }
 
   Future<void> _pair(HttpRequest req, List<String> seg) async {

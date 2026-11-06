@@ -8,6 +8,7 @@ import 'package:lan_share/ui/transfer_ring.dart';
 Widget host(Widget w) => MaterialApp(theme: appTheme(), home: Scaffold(body: w));
 
 void main() {
+  manualTests();
   test('file types get their own icon and colour', () {
     expect(fileLook('a.PNG').$2, C.violet);
     expect(fileLook('a.mp4').$2, C.red);
@@ -40,3 +41,17 @@ void main() {
 }
 
 Object? tester(WidgetTester t) => t.takeException();
+
+void manualTests() {
+  testWidgets('manual mode shows address and grouped code, toggle hidden when no code', (t) async {
+    final link = Uri.parse('https://192.168.1.5:4000/abc?fp=${'a' * 64}');
+    await t.pumpWidget(host(SendView(
+      phase: Phase.waiting, link: link, fileCount: 1, accessCode: '123456', showManual: true)));
+    expect(find.text('192.168.1.5:4000'), findsOneWidget);
+    expect(find.text('123 456'), findsOneWidget);
+    expect(find.byKey(const Key('qr')), findsNothing);
+    expect(find.byKey(const Key('manual')), findsOneWidget);
+    await t.pumpWidget(host(SendView(phase: Phase.waiting, link: link, fileCount: 1)));
+    expect(find.byKey(const Key('manual')), findsNothing);
+  });
+}
