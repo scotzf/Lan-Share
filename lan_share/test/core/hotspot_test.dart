@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lan_share/core/hotspot.dart';
 
@@ -14,6 +16,7 @@ class FakeScript {
 const startOk = '{"owned":true,"ok":true,"ssid":"LANShare-58U3","pass":"ccVHpZkSvJqL","ip":"192.168.137.1"}';
 
 void main() {
+  closingWhileStartingTests();
   group('wifiQrString', () {
     test('plain names', () {
       expect(wifiQrString('LANShare-58U3', 'ccVHpZkSvJqL'),
@@ -85,5 +88,39 @@ void main() {
       await Hotspot(fake.call).recover();
       expect(fake.calls, ['recover']);
     });
+  });
+}
+
+void closingWhileStartingTests() {
+  test('stopping while the hotspot is still starting waits for it, then turns it off', () async {
+    final calls = <String>[];
+    final startGate = Completer<String>();
+    final h = Hotspot((cmd) {
+      calls.add(cmd);
+      return cmd == 'start' ? startGate.future : Future.value('{"ok":true}');
+    });
+    final starting = h.start();
+    final stopping = h.stop(); // the window is closed right now
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(calls, ['start'], reason: 'stop must wait for the start to finish, not skip it');
+    startGate.complete(startOk);
+    await starting;
+    await stopping;
+    expect(calls, ['start', 'stop']);
+  });
+
+  test('stopping while a start that then fails does not try to turn anything off', () async {
+    final calls = <String>[];
+    final gate = Completer<String>();
+    final h = Hotspot((cmd) {
+      calls.add(cmd);
+      return cmd == 'start' ? gate.future : Future.value('{"ok":true}');
+    });
+    final starting = h.start().catchError((_) => const HotspotInfo('', '', '', false));
+    final stopping = h.stop();
+    gate.complete('{"ok":false,"error":"offline"}');
+    await starting;
+    await stopping;
+    expect(calls, ['start']);
   });
 }

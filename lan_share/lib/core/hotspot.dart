@@ -34,7 +34,11 @@ class Hotspot {
   final ScriptRunner _run;
   bool _ours = false;
 
-  Future<HotspotInfo> start() async {
+  Future<HotspotInfo>? _starting;
+
+  Future<HotspotInfo> start() => _starting = _start();
+
+  Future<HotspotInfo> _start() async {
     final j = await _json('start');
     if (j['ok'] != true) throw HotspotException('${j['error'] ?? 'failed'}');
     final owned = j['owned'] == true;
@@ -48,8 +52,18 @@ class Hotspot {
   }
 
   /// Turns the hotspot off and restores the user's settings. Only acts on a
-  /// hotspot this object started; safe to call more than once.
+  /// hotspot this object started; safe to call more than once. If a start is still
+  /// running (the window was closed in the first seconds) it waits for it first,
+  /// otherwise the hotspot would finish starting after we are gone.
   Future<void> stop() async {
+    final pending = _starting;
+    if (pending != null) {
+      try {
+        await pending;
+      } on HotspotException {
+        // the start failed, so there is nothing to turn off
+      }
+    }
     if (!_ours) return;
     _ours = false;
     await _json('stop');

@@ -16,6 +16,10 @@ New-Item -ItemType Directory -Force $Target | Out-Null
 Copy-Item -Path (Join-Path $Source '*') -Destination $Target -Recurse -Force
 $exe = Join-Path $Target 'lan_share.exe'
 
+# The Android app, offered to phones from the laptop's download page (build it first, see dist\README)
+$apk = Join-Path $PSScriptRoot '..\..\dist\lanshare.apk'
+if (Test-Path $apk) { Copy-Item $apk (Join-Path $Target 'lanshare.apk') -Force }
+
 # 2. Right-click entry (Show more options)
 $cmd = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\Classes\*\shell\LANShare\command')
 $cmd.SetValue('', '"' + $exe + '" "%1"'); $cmd.Close()

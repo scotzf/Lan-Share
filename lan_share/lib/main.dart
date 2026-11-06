@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import 'core/args.dart';
 import 'core/hotspot.dart';
@@ -56,20 +55,9 @@ class _HomeState extends State<Home> {
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _send(widget.initial, closeApp: true));
     }
-    if (Platform.isAndroid) _listenShares();
     // a hotspot left on by a crashed run is turned off and the user's settings restored
-    if (Platform.isWindows) unawaited(Hotspot(powershellRunner).recover());
-  }
-
-  Future<void> _listenShares() async {
-    List<File> toFiles(List<SharedMediaFile> m) =>
-        [for (final f in m) if (File(f.path).existsSync()) File(f.path)];
-    final first = toFiles(await ReceiveSharingIntent.instance.getInitialMedia());
-    if (first.isNotEmpty && mounted) _send(first);
-    ReceiveSharingIntent.instance.getMediaStream().listen((m) {
-      final files = toFiles(m);
-      if (files.isNotEmpty && mounted) _send(files);
-    });
+    // (when sharing right away, the sending screen does this itself, before it starts a hotspot)
+    if (Platform.isWindows && widget.initial.isEmpty) unawaited(Hotspot(powershellRunner).recover());
   }
 
   void _send(List<File> files, {bool closeApp = false}) => Navigator.of(context).push(

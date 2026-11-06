@@ -84,10 +84,18 @@ class _SendScreenState extends State<SendScreen> {
     _supportDir = await getApplicationSupportDirectory();
     if (widget.settings == null) _settings = await Settings.load(_supportDir!);
     await _start();
-    // hotspot assist: the Android app can join it when the phone is not on this Wi-Fi
+    // hotspot assist: the Android app can join it when the phone is not on this Wi-Fi.
+    // A hotspot left on by a crashed run is cleaned up first, one step after the other.
     if (mounted && _settings.hotspotAssist && Platform.isWindows && _phase == Phase.waiting) {
-      unawaited(_beginHotspot());
+      await _hotspot.recover();
+      if (mounted && _phase == Phase.waiting) unawaited(_beginHotspot());
     }
+  }
+
+  /// The Android app, if it was installed next to this program: offered to phones that lack it.
+  File? _apkFile() {
+    final f = File('${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}lanshare.apk');
+    return f.existsSync() ? f : null;
   }
 
   Future<void> _saveSettings() async {
@@ -115,7 +123,7 @@ class _SendScreenState extends State<SendScreen> {
     try {
       final identity = await loadOrCreateIdentity(await getApplicationSupportDirectory());
       // listens on every network, so the same QR works on the home Wi-Fi and on the hotspot
-      final server = SenderServer(widget.files, TokenStore(), identity: identity, bindAll: true);
+      final server = SenderServer(widget.files, TokenStore(), identity: identity, bindAll: true, apk: _apkFile());
       final link = await server.start();
       _server = server;
       _subs.add(server.progress.listen(_onProgress));

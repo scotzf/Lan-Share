@@ -49,6 +49,8 @@ const _logo = r'''<svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
 
 const _downIcon = r'''<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-5-5m5 5 5-5M5 20h14"/></svg>''';
 
+const _phoneIcon = r'''<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M12 8v6m0 0-2.5-2.5M12 14l2.5-2.5"/></svg>''';
+
 const _css = r'''
 :root{--bg:#0b1220;--card:#151e33;--fg:#f8fafc;--muted:#94a3b8;--glow:.38;--shadow:rgba(0,0,0,.28)}
 @media (prefers-color-scheme:light){:root{--bg:#f3f6fc;--card:#fff;--fg:#0f172a;--muted:#64748b;--glow:.2;--shadow:rgba(30,58,138,.14)}}
@@ -72,6 +74,8 @@ font-weight:800;font-size:13px;letter-spacing:.04em;color:#fff;background:#94a3b
 .all{width:100%;height:60px;margin-top:8px;border:0;border-radius:22px;background:#22c55e;color:#04210f;
 font:800 18px system-ui;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 10px 30px rgba(34,197,94,.35)}
 .all:active{transform:scale(.97)}
+.app{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:24px;padding:14px;border-radius:20px;
+color:var(--muted);text-decoration:none;font-weight:600;border:2px dashed rgba(148,163,184,.4)}
 form{display:flex;gap:12px;justify-content:center;margin:8px auto 0;max-width:420px}
 input{flex:1;min-width:0;max-width:300px;font:800 30px system-ui;letter-spacing:.22em;text-align:center;padding:14px 4px 14px 14px;
 border-radius:22px;border:2px solid #3b82f6;background:var(--card);color:inherit;outline:none;box-shadow:0 0 34px rgba(59,130,246,.3)}
@@ -92,7 +96,7 @@ String _shell(String body, {bool center = false}) => '<!doctype html><html lang=
     '<style>$_css</style><main${center ? ' class="c"' : ''}>$_logo$body</main></html>';
 
 /// Page listing the shared files, one tap to save each, or all at once.
-String downloadPage(List<WebFile> files) {
+String downloadPage(List<WebFile> files, {String? appLink}) {
   final rows = files.map((f) {
     final ext = _ext(f.name);
     final label = ext.isEmpty ? 'FILE' : (ext.length > 4 ? ext.substring(0, 4) : ext).toUpperCase();
@@ -106,7 +110,10 @@ String downloadPage(List<WebFile> files) {
           '<script>function saveAll(){var a=document.querySelectorAll("a.f"),i=0;'
           '(function n(){if(i<a.length){a[i++].click();setTimeout(n,800)}})()}</script>'
       : '';
-  return _shell('$rows$all');
+  final app = appLink == null
+      ? ''
+      : '<a class="app" href="${_attr.convert(appLink)}" download>$_phoneIcon Android app</a>';
+  return _shell('$rows$all$app');
 }
 
 /// Typed-code entry; the error and lock states are shown, not explained.

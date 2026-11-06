@@ -30,6 +30,7 @@ class SenderServer {
     this.pairingCode,
     this.httpRedirectPort = 80,
     this.bindAll = false,
+    this.apk,
   });
 
   final List<File> files;
@@ -47,6 +48,9 @@ class SenderServer {
   /// Listen on every network interface (home Wi-Fi, hotspot, ...) while the
   /// link and the typed address still show [bindAddress] / the LAN address.
   final bool bindAll;
+
+  /// The Android app, offered on the download page and at /app.apk (no token needed).
+  final File? apk;
 
   HttpServer? _server;
   HttpServer? _redirect;
@@ -172,6 +176,7 @@ class SenderServer {
     try {
       if (seg.isEmpty || (seg.length == 1 && seg[0].isEmpty)) return await _joinPage(req);
       if (seg.length == 1 && seg[0] == 'ping') return await _reply(req, 204);
+      if (seg.length == 1 && seg[0] == 'app.apk') return await _apk(req);
       if (seg.length == 1 && seg[0] == 'join') return await _join(req);
       if (seg.isNotEmpty && seg[0] == 'pair') return await _pair(req, seg);
       if (seg.length == 1 && seg[0].isNotEmpty) {
@@ -201,6 +206,17 @@ class SenderServer {
   }
 
   /// Typed-code entry for phones that cannot scan the QR.
+  Future<void> _apk(HttpRequest req) async {
+    final f = apk;
+    if (f == null || !f.existsSync()) return _reply(req, 404);
+    req.response
+      ..headers.contentType = ContentType('application', 'vnd.android.package-archive')
+      ..headers.set('Content-Disposition', 'attachment; filename="lanshare.apk"')
+      ..contentLength = f.lengthSync();
+    await req.response.addStream(f.openRead());
+    await req.response.close();
+  }
+
   Future<void> _joinPage(HttpRequest req, [JoinState state = JoinState.fresh, int code = 200]) async {
     req.response
       ..statusCode = code
@@ -267,7 +283,7 @@ class SenderServer {
   String _page(List<Map<String, Object>> list) => downloadPage([
         for (final f in list)
           WebFile(f['name'] as String, f['size'] as int, f['url'] as String)
-      ]);
+      ], appLink: (apk != null && apk!.existsSync()) ? '/app.apk' : null);
 
   Future<void> _file(HttpRequest req, int i) async {
     final f = files[i];

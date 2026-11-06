@@ -8,6 +8,11 @@
 param([Parameter(Position = 0)][string]$Command = 'status', [int]$OwnerPid = 0)
 $ErrorActionPreference = 'Stop'
 
+# One start/stop/recover at a time: a cleanup and a new start must never interleave,
+# or the user's own hotspot settings could be overwritten with ours.
+$mutex = New-Object System.Threading.Mutex($false, 'Local\LANShareHotspot')
+if ($Command -in 'start', 'stop', 'recover') { [void]$mutex.WaitOne(90000) }
+
 function Out-Json($o) { $o | ConvertTo-Json -Compress; exit 0 }
 function Fail($msg) { Out-Json @{ ok = $false; error = $msg } }
 
@@ -76,7 +81,20 @@ switch ($Command) {
       Out-Json @{ ok = $true; ssid = $cfg.Ssid; pass = $cfg.Passphrase; ip = $ip; owned = $false }
     }
     New-Item -ItemType Directory -Force $stateDir | Out-Null
-    @{ ssid = $cfg.Ssid; pass = $cfg.Passphrase; ownerPid = $OwnerPid } | ConvertTo-Json -Compress | Set-Content $stateFile -Encoding UTF8
+    if (Test-Path $stateFile) {
+      # a leftover from a crashed run still holds the user's real settings: keep them
+      $keep = Get-Content $stateFile -Raw | ConvertFrom-Json
+      @{ ssid = $keep.ssid; pass = $keep.pass; ownerPid = $OwnerPid } | ConvertTo-Json -Compress | Set-Content $stateFile -Encoding UTF8
+    } elseif ($cfg.Ssid -like 'LANShare-*') {
+      # the current settings are one of ours (a past run never restored them): the user's real
+      # ones are gone, so remember a sensible default instead of our temporary name
+      $alpha = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'.ToCharArray()
+      $r = New-Object System.Random
+      @{ ssid = ($env:COMPUTERNAME + ' ' + $r.Next(1000, 9999)); pass = (-join (1..12 | ForEach-Object { $alpha[$r.Next($alpha.Length)] })); ownerPid = $OwnerPid } |
+        ConvertTo-Json -Compress | Set-Content $stateFile -Encoding UTF8
+    } else {
+      @{ ssid = $cfg.Ssid; pass = $cfg.Passphrase; ownerPid = $OwnerPid } | ConvertTo-Json -Compress | Set-Content $stateFile -Encoding UTF8
+    }
     $chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'.ToCharArray()
     $rand = New-Object System.Random
     $newPass = -join (1..12 | ForEach-Object { $chars[$rand.Next($chars.Length)] })
