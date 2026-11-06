@@ -45,8 +45,19 @@ if ("$cap" -ne 'Enabled') { Fail "unavailable:$cap" }
 $mgr = [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager]::CreateFromConnectionProfile($profile)
 
 function Hotspot-Ip {
-  $a = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -like '192.168.137.*' } | Select-Object -First 1
-  if ($a) { $a.IPAddress } else { '192.168.137.1' }
+  $a = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+    Where-Object { $_.IPAddress -like '192.168.137.*' -and $_.AddressState -eq 'Preferred' } | Select-Object -First 1
+  if ($a) { $a.IPAddress } else { $null }
+}
+
+# Windows reports the hotspot started before it has an address; wait for it (up to ~20 s).
+function Wait-HotspotIp {
+  for ($i = 0; $i -lt 40; $i++) {
+    $ip = Hotspot-Ip
+    if ($ip) { return $ip }
+    Start-Sleep -Milliseconds 500
+  }
+  return $null
 }
 
 switch ($Command) {
@@ -60,7 +71,9 @@ switch ($Command) {
     $cfg = $mgr.GetCurrentAccessPointConfiguration()
     if ("$($mgr.TetheringOperationalState)" -eq 'On') {
       # the user's own hotspot is already running: use it as it is and never turn it off
-      Out-Json @{ ok = $true; ssid = $cfg.Ssid; pass = $cfg.Passphrase; ip = (Hotspot-Ip); owned = $false }
+      $ip = Wait-HotspotIp
+      if (-not $ip) { Fail 'start:noaddress' }
+      Out-Json @{ ok = $true; ssid = $cfg.Ssid; pass = $cfg.Passphrase; ip = $ip; owned = $false }
     }
     New-Item -ItemType Directory -Force $stateDir | Out-Null
     @{ ssid = $cfg.Ssid; pass = $cfg.Passphrase; ownerPid = $OwnerPid } | ConvertTo-Json -Compress | Set-Content $stateFile -Encoding UTF8
@@ -79,7 +92,17 @@ switch ($Command) {
       Remove-Item $stateFile -ErrorAction SilentlyContinue
       Fail "start:$($res.Status)"
     }
-    Out-Json @{ ok = $true; ssid = $cfg.Ssid; pass = $newPass; ip = (Hotspot-Ip); owned = $true }
+    $ip = Wait-HotspotIp
+    if (-not $ip) {
+      # no address ever appeared: undo everything so the hotspot is not left half on
+      $null = Await-Op ($mgr.StopTetheringAsync()) ([Windows.Networking.NetworkOperators.NetworkOperatorTetheringOperationResult])
+      $old = Get-Content $stateFile -Raw | ConvertFrom-Json
+      $cfg.Ssid = $old.ssid; $cfg.Passphrase = $old.pass
+      Await-Action ($mgr.ConfigureAccessPointAsync($cfg))
+      Remove-Item $stateFile -ErrorAction SilentlyContinue
+      Fail 'start:noaddress'
+    }
+    Out-Json @{ ok = $true; ssid = $cfg.Ssid; pass = $newPass; ip = $ip; owned = $true }
   }
   { $_ -in 'stop', 'recover' } {
     if (-not (Test-Path $stateFile)) { Out-Json @{ ok = $true; state = 'not-ours' } }

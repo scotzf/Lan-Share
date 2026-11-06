@@ -16,8 +16,11 @@ import 'send_view.dart';
 import 'transfer_ring.dart';
 
 class SendScreen extends StatefulWidget {
-  const SendScreen({super.key, required this.files, this.closeApp = false});
+  const SendScreen({super.key, required this.files, this.closeApp = false, this.hotspotRunner});
   final List<File> files;
+
+  /// Runs the hotspot script; tests swap it to fake a joined phone.
+  final ScriptRunner? hotspotRunner;
 
   /// Started from the Windows share menu: closing ends the app.
   final bool closeApp;
@@ -40,7 +43,7 @@ class _SendScreenState extends State<SendScreen> {
   PairRequest? _pair;
   bool _manual = false;
 
-  final Hotspot _hotspot = Hotspot(powershellRunner);
+  late final Hotspot _hotspot;
   HotspotUi _hsUi = HotspotUi.off;
   HotspotInfo? _hsInfo;
   Timer? _hsPoll;
@@ -50,6 +53,7 @@ class _SendScreenState extends State<SendScreen> {
   @override
   void initState() {
     super.initState();
+    _hotspot = Hotspot(widget.hotspotRunner ?? powershellRunner);
     // closing the window must not leave the hotspot on
     _lifecycle = AppLifecycleListener(onExitRequested: () async {
       await _hotspot.stop();
@@ -144,8 +148,19 @@ class _SendScreenState extends State<SendScreen> {
         return;
       }
       _hsInfo = info;
-      await _start(); // the server now listens on the hotspot address
-      if (!mounted) return;
+      // the server must listen on the hotspot address; the address can lag a moment
+      for (var i = 0; i < 6; i++) {
+        await _start();
+        if (!mounted) return;
+        if (_phase != Phase.failed) break;
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
+      if (_phase == Phase.failed) {
+        _hsInfo = null;
+        setState(() => _hsUi = HotspotUi.off);
+        await _hotspot.stop(); // never leave the hotspot on after a failure
+        return;
+      }
       setState(() => _hsUi = HotspotUi.joining);
       _pollClients();
     } on HotspotException catch (e) {
