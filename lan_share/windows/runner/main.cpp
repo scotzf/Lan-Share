@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include "flutter_window.h"
+#include "share_target.h"
 #include "utils.h"
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
@@ -21,6 +22,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
+
+  // Files from the Windows "Share with" menu arrive as extra path arguments.
+  for (auto &path : GetSharedFilePaths()) {
+    command_line_arguments.push_back(std::move(path));
+  }
 
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 

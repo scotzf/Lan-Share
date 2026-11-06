@@ -1,3 +1,4 @@
 .superpowers/
 build/
 .dart_tool/
+lan_share/windows/sparse/lanshare.msix
