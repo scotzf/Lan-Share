@@ -87,7 +87,7 @@ class ReceiverClient {
     return PairSession(code, wait());
   }
 
-  Future<void> receive(Uri link, Directory dest, {String? pairingCode}) async {
+  Future<List<File>> receive(Uri link, Directory dest, {String? pairingCode}) async {
     HttpClient? client;
     try {
       if (link.scheme == 'https') {
@@ -109,14 +109,21 @@ class ReceiverClient {
         throw TransferException('refused ${res.statusCode}');
       }
       final m = jsonDecode(await utf8.decodeStream(res)) as Map;
+      final list = (m['files'] as List).cast<Map>();
+      final grand = list.fold<int>(0, (a, f) => a + ((f['size'] as num?)?.toInt() ?? 0));
       final taken = <String>{};
-      for (final f in (m['files'] as List).cast<Map>()) {
+      final saved = <File>[];
+      var before = 0; // bytes of the files already finished
+      for (final f in list) {
         final name = safeName(f['name'] as String, taken);
         taken.add(name);
-        await _download(client, link.resolve(f['url'] as String),
-            File('${dest.path}${Platform.pathSeparator}$name'), name);
+        final out = File('${dest.path}${Platform.pathSeparator}$name');
+        await _download(client, link.resolve(f['url'] as String), out, name, before, grand);
+        before += out.lengthSync();
+        saved.add(out);
       }
       _progress.add(const TransferProgress(TransferState.done));
+      return saved;
     } on TransferException {
       _progress.add(const TransferProgress(TransferState.failed));
       rethrow;
@@ -128,7 +135,7 @@ class ReceiverClient {
     }
   }
 
-  Future<void> _download(HttpClient c, Uri url, File out, String name) async {
+  Future<void> _download(HttpClient c, Uri url, File out, String name, int before, int grand) async {
     final res = await (await c.getUrl(url)).close();
     if (res.statusCode != 200) {
       await res.drain();
@@ -146,10 +153,12 @@ class ReceiverClient {
         if (clock.elapsedMilliseconds - lastEmit >= 100) {
           lastEmit = clock.elapsedMilliseconds;
           _progress.add(TransferProgress(TransferState.active,
-              sent: got, total: total, name: name));
+              sent: got, total: total, name: name, overallSent: before + got, overallTotal: grand));
         }
         return chunk;
       }));
+      _progress.add(TransferProgress(TransferState.active,
+          sent: got, total: total, name: name, overallSent: before + got, overallTotal: grand));
       ok = true;
     } finally {
       await sink.close();

@@ -9,12 +9,18 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'core/args.dart';
 import 'core/hotspot.dart';
 import 'core/hotspot_runner.dart';
+import 'mobile/mobile_app.dart';
 import 'ui/home_view.dart';
 import 'ui/receive_screen.dart';
 import 'ui/send_screen.dart';
 import 'ui/theme.dart';
 
 void main(List<String> args) {
+  // the phone gets its own receiving app; the laptop keeps the sharing app
+  if (Platform.isAndroid) {
+    runApp(const MobileApp());
+    return;
+  }
   runApp(App(initial: parseSharedPaths(args)));
 }
 
