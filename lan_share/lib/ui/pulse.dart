@@ -1,6 +1,8 @@
 
 import 'package:flutter/material.dart';
 
+import 'theme.dart';
+
 /// Rings that expand and fade behind [child]; shows "searching" without words.
 class Pulse extends StatefulWidget {
   const Pulse({super.key, required this.color, required this.size, required this.child});
@@ -118,16 +120,19 @@ class GlowBackground extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => AnimatedContainer(
-        duration: const Duration(milliseconds: 400),
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: const Alignment(0, -0.35),
-            radius: 1.1,
-            colors: [color.withValues(alpha: .28), const Color(0xFF0B1220)],
-            stops: const [0, 0.85],
-          ),
+  Widget build(BuildContext context) {
+    final pal = Pal.of(context);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(0, -0.35),
+          radius: 1.1,
+          colors: [color.withValues(alpha: pal.glow), pal.bg],
+          stops: const [0, 0.85],
         ),
-        child: child,
-      );
+      ),
+      child: child,
+    );
+  }
 }

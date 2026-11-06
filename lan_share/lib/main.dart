@@ -1,10 +1,12 @@
 import 'dart:io';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import 'core/args.dart';
+import 'ui/home_view.dart';
 import 'ui/receive_screen.dart';
 import 'ui/send_screen.dart';
 import 'ui/theme.dart';
@@ -21,7 +23,9 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
         title: 'LAN Share',
         debugShowCheckedModeBanner: false,
-        theme: appTheme(),
+        theme: lightTheme(),
+        darkTheme: appTheme(),
+        themeMode: ThemeMode.system,
         home: Home(initial: initial),
       );
 }
@@ -34,11 +38,14 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  bool _dragging = false;
+
   @override
   void initState() {
     super.initState();
     if (widget.initial.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _send(widget.initial, closeApp: true));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _send(widget.initial, closeApp: true));
     }
     if (Platform.isAndroid) _listenShares();
   }
@@ -65,51 +72,24 @@ class _HomeState extends State<Home> {
     if (files.isNotEmpty && mounted) _send(files);
   }
 
+  void _dropped(DropDoneDetails d) {
+    setState(() => _dragging = false);
+    // folders are skipped: only real files can be served
+    final files = [for (final f in d.files) if (File(f.path).existsSync()) File(f.path)];
+    if (files.isNotEmpty && mounted) _send(files);
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(children: [
-              Expanded(
-                  child: _Tile(
-                key: const Key('send'),
-                icon: Icons.north_rounded,
-                colors: const [C.blue, C.violet],
-                onTap: _pick,
-              )),
-              const SizedBox(height: 16),
-              Expanded(
-                  child: _Tile(
-                key: const Key('receive'),
-                icon: Icons.south_rounded,
-                colors: const [C.green, Color(0xFF14B8A6)],
-                onTap: () => Navigator.of(context)
-                    .push(MaterialPageRoute(builder: (_) => const ReceiveScreen())),
-              )),
-            ]),
-          ),
-        ),
-      );
-}
-
-class _Tile extends StatelessWidget {
-  const _Tile({super.key, required this.icon, required this.colors, required this.onTap});
-  final IconData icon;
-  final List<Color> colors;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => Material(
-        borderRadius: BorderRadius.circular(36),
-        clipBehavior: Clip.antiAlias,
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-                colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-          ),
-          child: InkWell(
-            onTap: onTap,
-            child: Center(child: Icon(icon, size: 110, color: Colors.white)),
+        body: DropTarget(
+          onDragEntered: (_) => setState(() => _dragging = true),
+          onDragExited: (_) => setState(() => _dragging = false),
+          onDragDone: _dropped,
+          child: HomeView(
+            dragging: _dragging,
+            onPick: _pick,
+            onReceive: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const ReceiveScreen())),
           ),
         ),
       );

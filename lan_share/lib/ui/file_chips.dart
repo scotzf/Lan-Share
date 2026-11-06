@@ -73,7 +73,7 @@ class _Tile extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: look.$2,
-          border: Border.all(color: C.bg, width: 3),
+          border: Border.all(color: Pal.of(context).bg, width: 3),
         ),
         child: Icon(look.$1, size: size * .5, color: Colors.white),
       );

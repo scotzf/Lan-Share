@@ -130,7 +130,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
           ),
         for (final s in _nearby)
           Card(
-            color: C.card,
+            color: Pal.of(context).card,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: ListTile(
               contentPadding: const EdgeInsets.all(12),

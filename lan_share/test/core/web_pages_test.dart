@@ -44,6 +44,14 @@ void main() {
     expect(locked, isNot(contains('<input')));
   });
 
+  test('pages follow the phone light/dark setting', () {
+    for (final html in [downloadPage(files), joinPage(), joinPage(JoinState.locked)]) {
+      expect(html, contains('prefers-color-scheme:light'));
+      expect(html, contains('var(--bg)'));
+      expect(html, isNot(contains('background:#151e33')));
+    }
+  });
+
   test('sizes read naturally', () {
     expect(formatSize(0), '0 B');
     expect(formatSize(900), '900 B');

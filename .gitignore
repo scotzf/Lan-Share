@@ -2,3 +2,4 @@
 build/
 .dart_tool/
 lan_share/windows/sparse/lanshare.msix
+lan_share/test/gallery/*.png

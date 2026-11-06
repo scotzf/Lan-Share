@@ -63,7 +63,7 @@ class SendView extends StatelessWidget {
               ),
               const Spacer(),
             ]),
-            Expanded(child: Center(child: _hero(color))),
+            Expanded(child: Center(child: _hero(context, color))),
             _switchLink(),
             FileChips(names: fileNames, count: fileCount, color: color),
             const SizedBox(height: 16),
@@ -90,10 +90,10 @@ class SendView extends StatelessWidget {
     );
   }
 
-  Widget _hero(Color color) {
-    if (pairCode != null) return _pairing();
+  Widget _hero(BuildContext context, Color color) {
+    if (pairCode != null) return _pairing(context);
     if (showManual && phase == Phase.waiting && link != null && accessCode != null) {
-      return _manual();
+      return _manual(context);
     }
     if (phase == Phase.waiting && link != null) {
       final urgent = remaining < .2;
@@ -133,14 +133,15 @@ class SendView extends StatelessWidget {
     return TransferRing(phase: phase, fraction: fraction, size: 230);
   }
 
-  Widget _manual() {
+  Widget _manual(BuildContext context) {
+    final pal = Pal.of(context);
     final c = accessCode!;
     final grouped = '${c.substring(0, 3)} ${c.substring(3)}';
     Widget tile(IconData icon, Color color, Widget child) => Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           decoration: BoxDecoration(
-            color: C.card,
+            color: pal.card,
             borderRadius: BorderRadius.circular(28),
             boxShadow: [BoxShadow(color: color.withValues(alpha: .3), blurRadius: 30)],
           ),
@@ -166,11 +167,13 @@ class SendView extends StatelessWidget {
     ]);
   }
 
-  Widget _pairing() => Column(mainAxisSize: MainAxisSize.min, children: [
+  Widget _pairing(BuildContext context) {
+    final pal = Pal.of(context);
+    return Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
           decoration: BoxDecoration(
-            color: C.card,
+            color: pal.card,
             borderRadius: BorderRadius.circular(32),
             boxShadow: [BoxShadow(color: C.violet.withValues(alpha: .4), blurRadius: 40)],
           ),
@@ -192,7 +195,8 @@ class SendView extends StatelessWidget {
               onPressed: onApprove,
               icon: const Icon(Icons.check, size: 38)),
         ]),
-      ]);
+    ]);
+  }
 
   Widget _action() {
     switch (phase) {
