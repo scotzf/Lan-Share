@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'theme.dart';
 
-enum Phase { waiting, active, done, failed, expired }
+enum Phase { waiting, active, done, failed, expired, offline }
 
 Color phaseColor(Phase p) => switch (p) {
       Phase.waiting => C.blue,
@@ -9,6 +9,7 @@ Color phaseColor(Phase p) => switch (p) {
       Phase.done => C.green,
       Phase.failed => C.red,
       Phase.expired => C.amber,
+      Phase.offline => const Color(0xFF94A3B8),
     };
 
 IconData phaseIcon(Phase p) => switch (p) {
@@ -17,6 +18,7 @@ IconData phaseIcon(Phase p) => switch (p) {
       Phase.done => Icons.check_rounded,
       Phase.failed => Icons.close_rounded,
       Phase.expired => Icons.timer_off_outlined,
+      Phase.offline => Icons.wifi_off_rounded,
     };
 
 /// Progress ring: fills while active, then shows a state icon.

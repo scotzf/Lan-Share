@@ -9,6 +9,7 @@ Widget host(Widget w) => MaterialApp(theme: appTheme(), home: Scaffold(body: w))
 
 void main() {
   manualTests();
+  offlineTests();
   test('file types get their own icon and colour', () {
     expect(fileLook('a.PNG').$2, C.violet);
     expect(fileLook('a.mp4').$2, C.red);
@@ -57,5 +58,18 @@ void manualTests() {
     expect(find.text('No scanner?'), findsOneWidget);
     await t.pumpWidget(host(SendView(phase: Phase.waiting, link: link, fileCount: 1)));
     expect(find.byKey(const Key('manual')), findsNothing);
+  });
+}
+
+void offlineTests() {
+  testWidgets('offline shows the no-network icon and one Retry button', (t) async {
+    var retried = false;
+    await t.pumpWidget(host(SendView(
+        phase: Phase.offline, link: null, fileCount: 2, onRetry: () => retried = true)));
+    await t.pumpAndSettle();
+    expect(find.byIcon(Icons.wifi_off_rounded), findsOneWidget);
+    expect(find.byKey(const Key('qr')), findsNothing);
+    await t.tap(find.text('Retry'));
+    expect(retried, isTrue);
   });
 }

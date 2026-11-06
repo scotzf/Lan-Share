@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../core/discovery.dart';
 import '../core/identity.dart';
+import '../core/lan_address.dart';
 import '../core/sender_server.dart';
 import '../core/token_store.dart';
 import 'send_view.dart';
@@ -52,6 +53,11 @@ class _SendScreenState extends State<SendScreen> {
       _link = null;
       _manual = false;
     });
+    // No Wi-Fi or LAN: a QR pointing at this machine alone would be useless.
+    if ((await pickLanAddress()).isLoopback) {
+      if (mounted) setState(() => _phase = Phase.offline);
+      return;
+    }
     try {
       final identity = await loadOrCreateIdentity(await getApplicationSupportDirectory());
       final server = SenderServer(widget.files, TokenStore(), identity: identity);
@@ -136,6 +142,7 @@ class _SendScreenState extends State<SendScreen> {
           fraction: _fraction,
           pairCode: _pair?.code,
           accessCode: _server?.accessCode,
+          manualAddress: _server?.shortAddress,
           showManual: _manual,
           onToggleManual: () => setState(() => _manual = !_manual),
           onApprove: () {

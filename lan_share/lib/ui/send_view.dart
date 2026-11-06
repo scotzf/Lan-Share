@@ -18,6 +18,7 @@ class SendView extends StatelessWidget {
     this.remaining = 1,
     this.pairCode,
     this.accessCode,
+    this.manualAddress,
     this.showManual = false,
     this.onToggleManual,
     this.onApprove,
@@ -39,6 +40,9 @@ class SendView extends StatelessWidget {
 
   /// 6-digit code for phones that cannot scan; shown with the address.
   final String? accessCode;
+
+  /// Short address to type on a phone; falls back to the link's host:port.
+  final String? manualAddress;
   final bool showManual;
   final VoidCallback? onToggleManual, onApprove, onDeny, onRefresh, onRetry, onClose;
 
@@ -153,7 +157,7 @@ class SendView extends StatelessWidget {
         );
     return Column(mainAxisSize: MainAxisSize.min, children: [
       tile(Icons.language, C.blue,
-          Text(link!.authority, key: const Key('manualAddress'),
+          Text(manualAddress ?? link!.authority, key: const Key('manualAddress'),
               style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700))),
       const SizedBox(height: 20),
       tile(Icons.pin_outlined, C.green,
@@ -194,6 +198,8 @@ class SendView extends StatelessWidget {
     switch (phase) {
       case Phase.done:
         return _Big(key: const Key('act'), icon: Icons.check, label: 'Done', color: C.green, onTap: onClose);
+      case Phase.offline:
+        return _Big(key: const Key('act'), icon: Icons.refresh, label: 'Retry', color: const Color(0xFF94A3B8), onTap: onRetry);
       case Phase.failed:
         return _Big(key: const Key('act'), icon: Icons.refresh, label: 'Retry', color: C.red, onTap: onRetry);
       case Phase.expired:

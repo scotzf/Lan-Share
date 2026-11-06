@@ -27,6 +27,7 @@ class SenderServer {
     this.preferredPort,
     this.identity,
     this.pairingCode,
+    this.httpRedirectPort = 80,
   });
 
   final List<File> files;
@@ -37,7 +38,13 @@ class SenderServer {
   final Identity? identity;
   final String? pairingCode;
 
+  /// Plain-http port that bounces to the secure code page, so a typed
+  /// address works. 80 means the browser default; 0 picks any free port.
+  final int httpRedirectPort;
+
   HttpServer? _server;
+  HttpServer? _redirect;
+  InternetAddress? _addr;
   Timer? _idleTimer;
   String? _session;
   String? _token;
@@ -68,12 +75,41 @@ class SenderServer {
     final addr = bindAddress ?? await pickLanAddress();
     _server = await _bind(addr);
     _server!.listen(_handle);
+    _addr = addr;
+    if (identity != null) await _startRedirect(addr);
     _token = tokens.issue();
     _resetIdle();
     final base = '${addr.address}:${_server!.port}/$_token';
     return identity == null
         ? Uri.parse('http://$base')
         : Uri.parse('https://$base?fp=${identity!.fingerprint}');
+  }
+
+  Future<void> _startRedirect(InternetAddress addr) async {
+    try {
+      _redirect = await HttpServer.bind(addr, httpRedirectPort);
+    } on SocketException {
+      // port taken: fall back to any free port; the address then shows it
+      _redirect = await HttpServer.bind(addr, 0);
+    }
+    _redirect!.listen((req) async {
+      _resetIdle();
+      req.response.statusCode = HttpStatus.found;
+      req.response.headers.set('location', 'https://${addr.address}:${_server?.port}/');
+      await req.response.close();
+    });
+  }
+
+  /// Plain-http entry that redirects to the secure page; null without TLS.
+  Uri? get httpUri => _redirect == null
+      ? null
+      : Uri(scheme: 'http', host: _addr!.address, port: _redirect!.port);
+
+  /// What a person types on a phone: the address, with the port only if needed.
+  String get shortAddress {
+    final r = _redirect;
+    if (r == null) return '${_addr?.address}:${_server?.port}';
+    return r.port == 80 ? _addr!.address : '${_addr!.address}:${r.port}';
   }
 
   Future<HttpServer> _bind(InternetAddress addr) async {
@@ -98,7 +134,10 @@ class SenderServer {
   Future<void> stop() async {
     _idleTimer?.cancel();
     final s = _server;
+    final r = _redirect;
     _server = null;
+    _redirect = null;
+    await r?.close(force: true);
     await s?.close(force: true);
   }
 
