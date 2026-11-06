@@ -54,6 +54,10 @@ void main() {
       'done': () => SendView(phase: Phase.done, link: null, fileCount: 3, fileNames: names, onClose: noop),
       'failed': () => SendView(phase: Phase.failed, link: null, fileCount: 3, fileNames: names, onRetry: noop, onClose: noop),
       'expired': () => SendView(phase: Phase.expired, link: null, fileCount: 3, fileNames: names, onRefresh: noop, onClose: noop),
+      'hs_starting': () => SendView(phase: Phase.waiting, link: link, fileCount: 3, fileNames: names, accessCode: '482915', hotspot: HotspotUi.starting, onToggleHotspot: noop, onToggleManual: noop, onClose: noop),
+      'hs_join': () => SendView(phase: Phase.waiting, link: link, fileCount: 3, fileNames: names, accessCode: '482915', hotspot: HotspotUi.joining, wifiQr: 'WIFI:T:WPA;S:LANShare-58U3;P:ccVHpZkSvJqL;;', hotspotName: 'LANShare-58U3', hotspotPass: 'ccVHpZkSvJqL', onToggleHotspot: noop, onToggleManual: noop, onClose: noop),
+      'hs_wifi': () => SendView(phase: Phase.waiting, link: link, fileCount: 3, fileNames: names, accessCode: '482915', showManual: true, hotspot: HotspotUi.joining, wifiQr: 'x', hotspotName: 'LANShare-58U3', hotspotPass: 'ccVHpZkSvJqL', onToggleHotspot: noop, onToggleManual: noop, onClose: noop),
+      'hs_ready': () => SendView(phase: Phase.waiting, link: link, fileCount: 3, fileNames: names, accessCode: '482915', remaining: .9, hotspot: HotspotUi.ready, onToggleHotspot: noop, onToggleManual: noop, onClose: noop),
       'offline': () => SendView(phase: Phase.offline, link: null, fileCount: 3, fileNames: names, onRetry: noop, onClose: noop),
     };
 

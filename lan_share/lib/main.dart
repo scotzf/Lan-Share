@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:desktop_drop/desktop_drop.dart';
@@ -6,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import 'core/args.dart';
+import 'core/hotspot.dart';
+import 'core/hotspot_runner.dart';
 import 'ui/home_view.dart';
 import 'ui/receive_screen.dart';
 import 'ui/send_screen.dart';
@@ -48,6 +51,8 @@ class _HomeState extends State<Home> {
           .addPostFrameCallback((_) => _send(widget.initial, closeApp: true));
     }
     if (Platform.isAndroid) _listenShares();
+    // a hotspot left on by a crashed run is turned off and the user's settings restored
+    if (Platform.isWindows) unawaited(Hotspot(powershellRunner).recover());
   }
 
   Future<void> _listenShares() async {
