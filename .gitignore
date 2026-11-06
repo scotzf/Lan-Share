@@ -1,7 +1,32 @@
-.superpowers/
+# Build output and tool caches
 build/
 .dart_tool/
-lan_share/windows/sparse/lanshare.msix
+.gradle/
+.superpowers/
+*.log
+
+# Built artifacts (rebuild them; see README)
+*.apk
+*.msix
 lan_share/test/gallery/*.png
-dist/*.apk
-lan_share/dist/*.apk
+
+# Secrets and local machine files: never commit
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+*.keystore
+local.properties
+.env
+.env.*
+hotspot_password*
+
+# Editors and OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+scratch/
