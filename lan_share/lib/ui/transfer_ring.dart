@@ -57,7 +57,14 @@ class TransferRing extends StatelessWidget {
             ),
           ),
         ),
-        Icon(phaseIcon(phase), size: size * .38, color: color),
+        TweenAnimationBuilder<double>(
+          key: ValueKey(phase),
+          tween: Tween(begin: 0.4, end: 1),
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.elasticOut,
+          builder: (_, v, child) => Transform.scale(scale: v, child: child),
+          child: Icon(phaseIcon(phase), size: size * .38, color: color),
+        ),
       ]),
     );
   }

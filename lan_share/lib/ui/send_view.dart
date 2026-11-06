@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+
+import 'file_chips.dart';
+import 'pulse.dart';
 import 'theme.dart';
 import 'transfer_ring.dart';
 
@@ -10,7 +13,9 @@ class SendView extends StatelessWidget {
     required this.phase,
     required this.link,
     required this.fileCount,
+    this.fileNames = const [],
     this.fraction = 0,
+    this.remaining = 1,
     this.pairCode,
     this.onApprove,
     this.onDeny,
@@ -22,70 +27,108 @@ class SendView extends StatelessWidget {
   final Phase phase;
   final Uri? link;
   final int fileCount;
+  final List<String> fileNames;
   final double fraction;
+
+  /// Life left on the QR code, 1 -> 0.
+  final double remaining;
   final String? pairCode;
   final VoidCallback? onApprove, onDeny, onRefresh, onRetry, onClose;
 
   @override
   Widget build(BuildContext context) {
     final color = phaseColor(phase);
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton.filledTonal(
-              key: const Key('close'),
-              onPressed: onClose,
-              icon: const Icon(Icons.close),
+    return GlowBackground(
+      color: color,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton.filledTonal(
+                key: const Key('close'),
+                onPressed: onClose,
+                icon: const Icon(Icons.close),
+              ),
             ),
-          ),
-          Expanded(child: Center(child: _hero(color))),
-          _Chips(count: fileCount, color: color),
-          const SizedBox(height: 16),
-          _action(),
-        ]),
+            Expanded(child: Center(child: _hero(color))),
+            FileChips(names: fileNames, count: fileCount, color: color),
+            const SizedBox(height: 16),
+            _action(),
+          ]),
+        ),
       ),
     );
   }
 
   Widget _hero(Color color) {
-    if (pairCode != null) {
-      return Column(mainAxisSize: MainAxisSize.min, children: [
-        Text(pairCode!,
-            key: const Key('pairCode'),
-            style: const TextStyle(fontSize: 64, fontWeight: FontWeight.w800, letterSpacing: 8)),
-        const SizedBox(height: 24),
+    if (pairCode != null) return _pairing();
+    if (phase == Phase.waiting && link != null) {
+      final urgent = remaining < .2;
+      final arcColor = urgent ? C.amber : C.blue;
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        child: TweenAnimationBuilder<double>(
+          key: ValueKey(link),
+          tween: Tween(begin: .88, end: 1),
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeOutBack,
+          builder: (_, s, child) => Opacity(
+            opacity: ((s - .88) / .12).clamp(0.0, 1.0),
+            child: Transform.scale(scale: s, child: child),
+          ),
+          child: Pulse(
+            color: color,
+            size: 400,
+            child: ExpiryArc(
+              key: const Key('qr'),
+              remaining: remaining,
+              color: arcColor,
+              child: Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [BoxShadow(color: color.withValues(alpha: .5), blurRadius: 44)],
+                ),
+                child: QrImageView(data: link.toString(), size: 250),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return TransferRing(phase: phase, fraction: fraction, size: 230);
+  }
+
+  Widget _pairing() => Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
+          decoration: BoxDecoration(
+            color: C.card,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [BoxShadow(color: C.violet.withValues(alpha: .4), blurRadius: 40)],
+          ),
+          child: Text(pairCode!,
+              key: const Key('pairCode'),
+              style: const TextStyle(fontSize: 64, fontWeight: FontWeight.w800, letterSpacing: 10)),
+        ),
+        const SizedBox(height: 32),
         Row(mainAxisSize: MainAxisSize.min, children: [
           IconButton.filled(
               key: const Key('deny'),
-              style: IconButton.styleFrom(backgroundColor: C.red, minimumSize: const Size(72, 72)),
+              style: IconButton.styleFrom(backgroundColor: C.red, minimumSize: const Size(76, 76)),
               onPressed: onDeny,
-              icon: const Icon(Icons.close, size: 36)),
-          const SizedBox(width: 32),
+              icon: const Icon(Icons.close, size: 38)),
+          const SizedBox(width: 36),
           IconButton.filled(
               key: const Key('approve'),
-              style: IconButton.styleFrom(backgroundColor: C.green, minimumSize: const Size(72, 72)),
+              style: IconButton.styleFrom(backgroundColor: C.green, minimumSize: const Size(76, 76)),
               onPressed: onApprove,
-              icon: const Icon(Icons.check, size: 36)),
+              icon: const Icon(Icons.check, size: 38)),
         ]),
       ]);
-    }
-    if (phase == Phase.waiting && link != null) {
-      return Container(
-        key: const Key('qr'),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(32),
-          boxShadow: [BoxShadow(color: C.blue.withValues(alpha: .45), blurRadius: 40)],
-        ),
-        child: QrImageView(data: link.toString(), size: 260),
-      );
-    }
-    return TransferRing(phase: phase, fraction: fraction, size: 220);
-  }
 
   Widget _action() {
     switch (phase) {
@@ -101,22 +144,6 @@ class SendView extends StatelessWidget {
   }
 }
 
-class _Chips extends StatelessWidget {
-  const _Chips({required this.count, required this.color});
-  final int count;
-  final Color color;
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(color: color.withValues(alpha: .18), borderRadius: BorderRadius.circular(999)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.insert_drive_file_rounded, color: color),
-          const SizedBox(width: 8),
-          Text('$count', style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.w700)),
-        ]),
-      );
-}
-
 class _Big extends StatelessWidget {
   const _Big({super.key, required this.icon, required this.label, required this.color, this.onTap});
   final IconData icon;
@@ -126,12 +153,16 @@ class _Big extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
         width: double.infinity,
-        height: 56,
+        height: 58,
         child: FilledButton.icon(
-          style: FilledButton.styleFrom(backgroundColor: color, foregroundColor: Colors.black),
+          style: FilledButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.black,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          ),
           onPressed: onTap,
           icon: Icon(icon),
-          label: Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          label: Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
         ),
       );
 }

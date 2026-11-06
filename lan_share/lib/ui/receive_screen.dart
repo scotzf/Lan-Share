@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import '../core/discovery.dart';
 import '../core/receiver_client.dart';
 import '../core/transfer_progress.dart';
+import 'pulse.dart';
 import 'theme.dart';
 import 'transfer_ring.dart';
 
@@ -118,8 +119,14 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       body = ListView(padding: const EdgeInsets.all(16), children: [
         if (_nearby.isEmpty)
           const Padding(
-            padding: EdgeInsets.symmetric(vertical: 64),
-            child: Icon(Icons.radar, size: 120, color: C.violet),
+            padding: EdgeInsets.symmetric(vertical: 48),
+            child: Center(
+              child: Pulse(
+                color: C.violet,
+                size: 280,
+                child: Icon(Icons.radar, size: 96, color: C.violet),
+              ),
+            ),
           ),
         for (final s in _nearby)
           Card(

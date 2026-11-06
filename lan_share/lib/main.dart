@@ -38,7 +38,7 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     if (widget.initial.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _send(widget.initial));
+      WidgetsBinding.instance.addPostFrameCallback((_) => _send(widget.initial, closeApp: true));
     }
     if (Platform.isAndroid) _listenShares();
   }
@@ -54,8 +54,8 @@ class _HomeState extends State<Home> {
     });
   }
 
-  void _send(List<File> files) => Navigator.of(context)
-      .push(MaterialPageRoute(builder: (_) => SendScreen(files: files)));
+  void _send(List<File> files, {bool closeApp = false}) => Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => SendScreen(files: files, closeApp: closeApp)));
 
   Future<void> _pick() async {
     final picked = await FilePicker.pickFiles();

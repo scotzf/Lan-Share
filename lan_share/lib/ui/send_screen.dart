@@ -13,8 +13,11 @@ import 'send_view.dart';
 import 'transfer_ring.dart';
 
 class SendScreen extends StatefulWidget {
-  const SendScreen({super.key, required this.files});
+  const SendScreen({super.key, required this.files, this.closeApp = false});
   final List<File> files;
+
+  /// Started from the Windows share menu: closing ends the app.
+  final bool closeApp;
 
   @override
   State<SendScreen> createState() => _SendScreenState();
@@ -25,6 +28,9 @@ class _SendScreenState extends State<SendScreen> {
   Discovery? _discovery;
   final List<StreamSubscription<Object?>> _subs = [];
   Timer? _expiry;
+  DateTime _expiresAt = DateTime.now();
+  double _remaining = 1;
+  static const _ttl = Duration(minutes: 5);
   Uri? _link;
   Phase _phase = Phase.waiting;
   double _fraction = 0;
@@ -59,8 +65,15 @@ class _SendScreenState extends State<SendScreen> {
       } catch (_) {
         // QR still works without nearby discovery
       }
-      _expiry = Timer(const Duration(minutes: 5), () {
-        if (mounted && _phase == Phase.waiting) setState(() => _phase = Phase.expired);
+      _expiresAt = DateTime.now().add(_ttl);
+      _remaining = 1;
+      _expiry = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted || _phase != Phase.waiting) return;
+        final left = _expiresAt.difference(DateTime.now());
+        setState(() {
+          _remaining = left.inMilliseconds / _ttl.inMilliseconds;
+          if (left <= Duration.zero) _phase = Phase.expired;
+        });
       });
       if (mounted) setState(() => _link = link);
     } catch (_) {
@@ -96,6 +109,14 @@ class _SendScreenState extends State<SendScreen> {
     _server = null;
   }
 
+  Future<void> _close() async {
+    if (widget.closeApp) {
+      await _teardown();
+      exit(0);
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   void dispose() {
     _teardown();
@@ -108,6 +129,8 @@ class _SendScreenState extends State<SendScreen> {
           phase: _phase,
           link: _link,
           fileCount: widget.files.length,
+          fileNames: [for (final f in widget.files) f.uri.pathSegments.last],
+          remaining: _remaining,
           fraction: _fraction,
           pairCode: _pair?.code,
           onApprove: () {
@@ -120,7 +143,7 @@ class _SendScreenState extends State<SendScreen> {
           },
           onRefresh: _start,
           onRetry: _start,
-          onClose: () => Navigator.of(context).pop(),
+          onClose: _close,
         ),
       );
 }
