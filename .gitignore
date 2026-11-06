@@ -4,3 +4,4 @@ build/
 lan_share/windows/sparse/lanshare.msix
 lan_share/test/gallery/*.png
 dist/*.apk
+lan_share/dist/*.apk
