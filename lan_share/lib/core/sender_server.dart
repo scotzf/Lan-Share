@@ -45,6 +45,7 @@ class SenderServer {
 
   HttpServer? _server;
   HttpServer? _redirect;
+  Uri? _link;
   InternetAddress? _addr;
   Timer? _idleTimer;
   String? _session;
@@ -72,6 +73,9 @@ class SenderServer {
 
   Stream<TransferProgress> get progress => _progress.stream;
 
+  /// The link a QR code carries; null before [start].
+  Uri? get link => _link;
+
   Future<Uri> start() async {
     final addr = bindAddress ?? await pickLanAddress();
     _server = await _bind(addr);
@@ -81,7 +85,7 @@ class SenderServer {
     _token = tokens.issue();
     _resetIdle();
     final base = '${addr.address}:${_server!.port}/$_token';
-    return identity == null
+    return _link = identity == null
         ? Uri.parse('http://$base')
         : Uri.parse('https://$base?fp=${identity!.fingerprint}');
   }
@@ -132,41 +136,54 @@ class SenderServer {
     _idleTimer = Timer(idle, stop);
   }
 
-  Future<void> stop() async {
+  /// Stops listening. [force] ends running downloads too; without it the
+  /// server stops taking new connections and lets running downloads finish
+  /// (forced anyway after two minutes).
+  Future<void> stop({bool force = true}) async {
     _idleTimer?.cancel();
     final s = _server;
     final r = _redirect;
     _server = null;
     _redirect = null;
     await r?.close(force: true);
-    await s?.close(force: true);
+    if (force) {
+      await s?.close(force: true);
+    } else if (s != null) {
+      unawaited(s.close());
+      Timer(const Duration(minutes: 2), () => s.close(force: true));
+    }
   }
 
   Future<void> _handle(HttpRequest req) async {
     _resetIdle();
     final seg = req.uri.pathSegments;
     try {
-      if (seg.isEmpty || (seg.length == 1 && seg[0].isEmpty)) return _joinPage(req);
-      if (seg.length == 1 && seg[0] == 'join') return _join(req);
-      if (seg.isNotEmpty && seg[0] == 'pair') return _pair(req, seg);
+      if (seg.isEmpty || (seg.length == 1 && seg[0].isEmpty)) return await _joinPage(req);
+      if (seg.length == 1 && seg[0] == 'join') return await _join(req);
+      if (seg.isNotEmpty && seg[0] == 'pair') return await _pair(req, seg);
       if (seg.length == 1 && seg[0].isNotEmpty) {
         final want = pairingCode;
         if (want != null &&
             !codesMatch(want, req.uri.queryParameters['code'] ?? '')) {
           unawaited(stop());
-          return _reply(req, 403);
+          return await _reply(req, 403);
         }
-        if (!tokens.consume(seg[0])) return _reply(req, 403);
+        if (!tokens.consume(seg[0])) return await _reply(req, 403);
         _session = _randomId();
-        return _manifest(req);
+        return await _manifest(req);
       }
       if (seg.length == 4 && seg[0] == 's' && seg[2] == 'f' && seg[1] == _session) {
         final i = int.tryParse(seg[3]);
-        if (i != null && i >= 0 && i < files.length) return _file(req, i);
+        if (i != null && i >= 0 && i < files.length) return await _file(req, i);
       }
-      return _reply(req, 404);
+      return await _reply(req, 404);
     } catch (_) {
-      return _reply(req, 500);
+      // a failure while answering (e.g. a file vanished) must never leave the phone waiting
+      try {
+        await _reply(req, 500);
+      } catch (_) {
+        // response already started or closed
+      }
     }
   }
 
@@ -268,7 +285,8 @@ class SenderServer {
     _finished.add(i);
     if (_finished.length == files.length) {
       _progress.add(const TransferProgress(TransferState.done));
-      unawaited(Future.delayed(const Duration(milliseconds: 200), stop));
+      // the phone may still be receiving the tail of the last file: stop gently
+      unawaited(Future.delayed(const Duration(milliseconds: 200), () => stop(force: false)));
     }
   }
 
