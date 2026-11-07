@@ -19,7 +19,8 @@ On the laptop: right-click files and choose **Share with → LAN Share** (or **S
 ## Features
 
 - **Direct and private.** The laptop runs a temporary server on your LAN and stops it after the transfer.
-- **Encrypted.** TLS with a self-signed certificate. The QR carries the certificate fingerprint, so the app only trusts your laptop. Each QR works once and expires after 5 minutes.
+- **Encrypted by default.** TLS with a self-signed certificate. The QR carries the certificate fingerprint, so the app only trusts your laptop. Each QR works once and expires after 5 minutes.
+- **Fast mode (a switch, off by default).** The **Fast** chip on the home screen shares over plain HTTP, like SHAREit: no browser certificate warning and much quicker (about 8× on the same PC: 22 MB/s encrypted, 188 MB/s plain, measured in the real app). The catch is that nothing is encrypted, so anyone on the same network who sees the link could download the files. Intended for your own home network. A bolt badge shows on the sending screen whenever a share is not encrypted. Your choice is remembered.
 - **One QR, two networks.** The server listens on the home Wi-Fi and on the laptop's hotspot. With *hotspot assist* (on by default) the QR also carries the hotspot details, so the Android app can reach the laptop when the phone is on another network. The hotspot is turned off after the transfer, and your own hotspot settings are restored.
 - **Nearby list.** Devices running the app can find each other and pair with a 4-digit code shown on both screens.
 - **Live feedback.** Progress ring with percentage and MB/s; clear icon states for done, failed, expired and offline.
@@ -90,7 +91,7 @@ The integration tests build a test harness into the Debug folder; run `flutter b
 
 ## Security notes
 
-- Traffic is encrypted end to end between the laptop and the phone; a phone browser shows a one-time certificate warning because the certificate is self-signed.
+- By default traffic is encrypted end to end between the laptop and the phone; a phone browser shows a one-time certificate warning because the certificate is self-signed. In **Fast mode** it is plain HTTP (not encrypted), by your choice.
 - The typed-code route locks after five wrong tries.
 - The hotspot uses a random name and password per session and is stopped afterwards.
 - Nothing is sent to any server other than the laptop itself.

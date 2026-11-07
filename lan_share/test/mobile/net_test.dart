@@ -89,4 +89,49 @@ void main() {
       expect(dest.listSync(), isEmpty);
     });
   });
+
+  group('fast mode (plain http links)', () {
+    late SenderServer plainServer;
+    late Uri plainLink;
+    setUp(() async {
+      final f = File('${work.path}/plain.txt')..writeAsStringSync('no encryption here');
+      plainServer = SenderServer([f], TokenStore(), bindAddress: InternetAddress.loopbackIPv4);
+      plainLink = await plainServer.start();
+    });
+    tearDown(() => plainServer.stop());
+
+    test('the link really is plain http with no fingerprint', () {
+      expect(plainLink.scheme, 'http');
+      expect(plainLink.queryParameters.containsKey('fp'), isFalse);
+    });
+
+    test('probeLink reaches a plain laptop, without using up the token', () async {
+      expect(await probeLink(plainLink), isTrue);
+      expect(await probeLink(plainLink), isTrue);
+      final dest = Directory.systemTemp.createTempSync('nt_p_');
+      addTearDown(() => dest.deleteSync(recursive: true));
+      expect((await downloadLink(plainLink, (_) {}, dest)).length, 1);
+    });
+
+    test('probeLink is false for a plain address where nothing listens, and quickly', () async {
+      final sw = Stopwatch()..start();
+      final dead = Uri(scheme: 'http', host: '127.0.0.1', port: 1, path: '/x');
+      expect(await probeLink(dead), isFalse);
+      expect(sw.elapsed, lessThan(const Duration(seconds: 5)));
+    });
+
+    test('downloadLink fetches the plain file byte for byte', () async {
+      final dest = Directory.systemTemp.createTempSync('nt_p2_');
+      addTearDown(() => dest.deleteSync(recursive: true));
+      final files = await downloadLink(plainLink, (_) {}, dest);
+      expect(File(files.single.path).readAsStringSync(), 'no encryption here');
+      expect(files.single.name, 'plain.txt');
+    });
+
+    test('an encrypted link is still refused without its fingerprint (no silent downgrade)', () async {
+      // same host and port, but claiming https with no fp: must not be trusted
+      final fake = Uri(scheme: 'https', host: plainLink.host, port: plainLink.port, path: plainLink.path);
+      expect(await probeLink(fake), isFalse);
+    });
+  });
 }

@@ -99,11 +99,19 @@ class _HomeState extends State<Home> {
     if (_dir != null) await _settings.save(_dir!);
   }
 
+  /// Fast mode on or off, remembered. On means shares are plain http and not encrypted.
+  Future<void> _toggleFast() async {
+    setState(() => _settings.fastMode = !_settings.fastMode);
+    if (_dir != null) await _settings.save(_dir!);
+  }
+
   /// A QR that sends a phone to the Android app on this laptop; closing it stops the sharing.
   Future<void> _phoneApp() async {
     final apk = _apk;
     if (apk == null) return;
-    final share = AppShare(apk, await loadOrCreateIdentity(await getApplicationSupportDirectory()));
+    // in Fast mode the app link is plain http too (no certificate warning on the phone)
+    final identity = _settings.fastMode ? null : await loadOrCreateIdentity(await getApplicationSupportDirectory());
+    final share = AppShare(apk, identity);
     try {
       final url = await share.start();
       if (!mounted) return;
@@ -146,6 +154,8 @@ class _HomeState extends State<Home> {
             onPhoneApp: _phoneApp,
             assistOn: _settings.hotspotAssist,
             onToggleAssist: Platform.isWindows ? _toggleAssist : null,
+            fastOn: _settings.fastMode,
+            onToggleFast: _toggleFast,
             address: _address,
           ),
         ),

@@ -31,6 +31,7 @@ class SenderServer {
     this.httpRedirectPort = 80,
     this.bindAll = false,
     this.apk,
+    this.redirect,
   });
 
   final List<File> files;
@@ -51,6 +52,12 @@ class SenderServer {
 
   /// The Android app, offered on the download page and at /app.apk (no token needed).
   final File? apk;
+
+  /// Start the plain-http listener that bounces a typed address to the code page. Defaults to
+  /// on when the server is encrypted (so `http://address` reaches the https page) and off
+  /// otherwise; fast mode (plain http) asks for it explicitly.
+  final bool? redirect;
+  bool get _wantsRedirect => redirect ?? (identity != null);
 
   HttpServer? _server;
   HttpServer? _redirect;
@@ -95,7 +102,7 @@ class SenderServer {
     _server = await _bind(listenOn);
     _server!.listen(_handle);
     _addr = addr;
-    if (identity != null) await _startRedirect(listenOn);
+    if (_wantsRedirect) await _startRedirect(listenOn);
     _token = tokens.issue();
     _resetIdle();
     final base = '${addr.address}:${_server!.port}/$_token';
@@ -116,7 +123,8 @@ class SenderServer {
       req.response.statusCode = HttpStatus.found;
       // the address the phone typed (home Wi-Fi or hotspot), so it works on either network
       final host = req.headers.host ?? _addr!.address;
-      req.response.headers.set('location', 'https://$host:${_server?.port}/');
+      final scheme = identity == null ? 'http' : 'https';
+      req.response.headers.set('location', '$scheme://$host:${_server?.port}/');
       await req.response.close();
     });
   }

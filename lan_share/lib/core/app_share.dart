@@ -10,7 +10,8 @@ class AppShare {
   AppShare(this.apk, this.identity, {this.bindAddress, this.idle = const Duration(minutes: 5)});
 
   final File apk;
-  final Identity identity;
+  /// null = Fast mode: a plain http link, no certificate.
+  final Identity? identity;
   final InternetAddress? bindAddress;
   final Duration idle;
 
@@ -33,7 +34,7 @@ class AppShare {
     );
     final link = await server.start();
     _server = server;
-    return _url = Uri(scheme: 'https', host: link.host, port: link.port, path: '/app.apk');
+    return _url = Uri(scheme: link.scheme, host: link.host, port: link.port, path: '/app.apk');
   }
 
   Future<void> stop() async {

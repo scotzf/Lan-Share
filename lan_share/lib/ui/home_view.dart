@@ -19,17 +19,22 @@ class HomeView extends StatelessWidget {
     this.showPhoneApp = false,
     this.assistOn = true,
     this.onToggleAssist,
+    this.fastOn = false,
+    this.onToggleFast,
     this.address,
   });
 
   final bool dragging;
-  final VoidCallback? onPick, onReceive, onPhoneApp, onToggleAssist;
+  final VoidCallback? onPick, onReceive, onPhoneApp, onToggleAssist, onToggleFast;
 
   /// Offer the Android app (its file is installed beside this program).
   final bool showPhoneApp;
 
   /// Hotspot assist on or off, and this laptop's address on the network (null = offline).
   final bool assistOn;
+
+  /// Fast mode: share over plain http (quicker, no certificate warning, not encrypted).
+  final bool fastOn;
   final String? address;
 
   @override
@@ -75,7 +80,7 @@ class HomeView extends StatelessWidget {
                     ],
                   ]),
                   const SizedBox(height: 24),
-                  _StatusStrip(assistOn: assistOn, onToggleAssist: onToggleAssist, address: address),
+                  _StatusStrip(assistOn: assistOn, onToggleAssist: onToggleAssist, fastOn: fastOn, onToggleFast: onToggleFast, address: address),
                 ]),
               ),
             ),
@@ -303,9 +308,10 @@ class _ActionTileState extends State<_ActionTile> {
 
 /// Small facts as chips: is the hotspot helper on (tap to change), and which network we are on.
 class _StatusStrip extends StatelessWidget {
-  const _StatusStrip({required this.assistOn, this.onToggleAssist, this.address});
+  const _StatusStrip({required this.assistOn, this.onToggleAssist, this.fastOn = false, this.onToggleFast, this.address});
   final bool assistOn;
-  final VoidCallback? onToggleAssist;
+  final VoidCallback? onToggleAssist, onToggleFast;
+  final bool fastOn;
   final String? address;
 
   @override
@@ -321,6 +327,16 @@ class _StatusStrip extends StatelessWidget {
           color: assistOn ? C.violet : C.slate,
           filled: assistOn,
           onTap: onToggleAssist,
+        ),
+      if (onToggleFast != null)
+        _Chip(
+          key: const Key('fast'),
+          tip: fastOn ? 'Fast mode: not encrypted' : 'Fast mode off: encrypted',
+          icon: Icons.bolt_rounded,
+          label: 'Fast',
+          color: fastOn ? C.amber : C.slate,
+          filled: fastOn,
+          onTap: onToggleFast,
         ),
       _Chip(
         key: const Key('address'),

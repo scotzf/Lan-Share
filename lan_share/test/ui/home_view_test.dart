@@ -149,4 +149,26 @@ void labelTests() {
       expect(t.takeException(), isNull, reason: 'width $w');
     }
   });
+
+  testWidgets('Fast chip: bolt icon, toggles, and its colour says whether encryption is off', (t) async {
+    var toggles = 0;
+    await t.pumpWidget(host(HomeView(dragging: false, fastOn: false, onToggleFast: () => toggles++, address: '192.168.1.3')));
+    expect(find.byKey(const Key('fast')), findsOneWidget);
+    expect(find.text('Fast'), findsOneWidget);
+    expect(find.byIcon(Icons.bolt_rounded), findsOneWidget);
+    await t.tap(find.byKey(const Key('fast')));
+    expect(toggles, 1);
+    // off = calm slate (encrypted); on = amber warning colour
+    Color chipColor() => t.widget<Icon>(find.descendant(of: find.byKey(const Key('fast')), matching: find.byType(Icon))).color!;
+    final off = chipColor();
+    await t.pumpWidget(host(HomeView(dragging: false, fastOn: true, onToggleFast: () {}, address: '192.168.1.3')));
+    final on = chipColor();
+    expect(on, C.amber);
+    expect(off, isNot(C.amber));
+  });
+
+  testWidgets('no Fast chip when there is no handler (e.g. not on Windows)', (t) async {
+    await t.pumpWidget(host(const HomeView(dragging: false)));
+    expect(find.byKey(const Key('fast')), findsNothing);
+  });
 }

@@ -27,6 +27,7 @@ class SendView extends StatelessWidget {
     required this.fileCount,
     this.fileNames = const [],
     this.fraction = 0,
+    this.fast = false,
     this.speedMBps,
     this.remaining = 1,
     this.pairCode,
@@ -54,6 +55,9 @@ class SendView extends StatelessWidget {
   final int fileCount;
   final List<String> fileNames;
   final double fraction;
+
+  /// This share is not encrypted (Fast mode); shown as a small bolt.
+  final bool fast;
 
   /// Live transfer speed, shown under the ring while sending.
   final double? speedMBps;
@@ -103,6 +107,17 @@ class SendView extends StatelessWidget {
                 icon: const Icon(Icons.close),
               ),
               const Spacer(),
+              if (fast)
+                Tooltip(
+                  message: 'Fast mode: not encrypted',
+                  child: Container(
+                    key: const Key('fastBadge'),
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(color: C.amber.withValues(alpha: .18), shape: BoxShape.circle),
+                    child: const Icon(Icons.bolt_rounded, color: C.amber, size: 26),
+                  ),
+                ),
             ]),
             Expanded(child: Center(child: _hero(context, color))),
             _links(),

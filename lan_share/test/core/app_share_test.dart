@@ -68,4 +68,22 @@ void main() {
     final share = AppShare(File('${dir.path}/missing.apk'), id, bindAddress: InternetAddress.loopbackIPv4);
     await expectLater(share.start(), throwsA(isA<StateError>()));
   });
+
+  test('fast mode: no identity gives a plain http link that still serves the app', () async {
+    final f = apk();
+    final share = AppShare(f, null, bindAddress: InternetAddress.loopbackIPv4);
+    addTearDown(share.stop);
+    final url = await share.start();
+    expect(url.scheme, 'http');
+    expect(url.path, '/app.apk');
+    final c = HttpClient();
+    final r = await (await c.getUrl(url)).close();
+    expect(r.statusCode, 200);
+    final b = BytesBuilder();
+    await for (final chunk in r) {
+      b.add(chunk);
+    }
+    expect(b.takeBytes(), f.readAsBytesSync());
+    c.close();
+  });
 }

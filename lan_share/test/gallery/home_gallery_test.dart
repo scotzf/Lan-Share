@@ -35,7 +35,8 @@ void main() {
     void noop() {}
     final sizes = {'wide': const Size(1280, 800), 'snap': const Size(560, 760), 'tiny': const Size(360, 640)};
     final states = <String, HomeView>{
-      'idle': HomeView(dragging: false, onPick: noop, onReceive: noop, onPhoneApp: noop, showPhoneApp: true, assistOn: true, onToggleAssist: noop, address: '192.168.1.3'),
+      'idle': HomeView(dragging: false, onPick: noop, onReceive: noop, onPhoneApp: noop, showPhoneApp: true, assistOn: true, onToggleAssist: noop, onToggleFast: noop, address: '192.168.1.3'),
+      'fast': HomeView(dragging: false, onPick: noop, onReceive: noop, onPhoneApp: noop, showPhoneApp: true, assistOn: true, onToggleAssist: noop, fastOn: true, onToggleFast: noop, address: '192.168.1.3'),
       'drag': HomeView(dragging: true, onPick: noop, onReceive: noop, onPhoneApp: noop, showPhoneApp: true, assistOn: true, onToggleAssist: noop, address: '192.168.1.3'),
       'offline': HomeView(dragging: false, onPick: noop, onReceive: noop, showPhoneApp: false, assistOn: false, onToggleAssist: noop, address: null),
     };

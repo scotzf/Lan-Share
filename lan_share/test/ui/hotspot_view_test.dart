@@ -29,6 +29,7 @@ SendView view({
     );
 
 void main() {
+  fastBadgeTests();
   assistTests();
   testWidgets('off: Hotspot button shown and tappable', (t) async {
     var taps = 0;
@@ -135,5 +136,22 @@ void assistTests() {
       onToggleHotspot: () {}, onToggleJoin: () {}, onToggleManual: () {},
     )));
     expect(find.byKey(const Key('wifiToggle')), findsNothing);
+  });
+}
+
+void fastBadgeTests() {
+  testWidgets('a bolt badge marks an unencrypted share, and only then', (t) async {
+    await t.pumpWidget(host(SendView(phase: Phase.waiting, link: link, fileCount: 1, fast: true)));
+    expect(find.byKey(const Key('fastBadge')), findsOneWidget);
+    expect(find.byIcon(Icons.bolt_rounded), findsOneWidget);
+    await t.pumpWidget(host(SendView(phase: Phase.waiting, link: link, fileCount: 1)));
+    expect(find.byKey(const Key('fastBadge')), findsNothing);
+  });
+
+  testWidgets('the badge stays visible while sending and when done', (t) async {
+    for (final p in [Phase.active, Phase.done]) {
+      await t.pumpWidget(host(SendView(phase: p, link: null, fileCount: 1, fraction: .3, fast: true)));
+      expect(find.byKey(const Key('fastBadge')), findsOneWidget, reason: '$p');
+    }
   });
 }

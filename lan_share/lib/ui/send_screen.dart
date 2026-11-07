@@ -57,6 +57,7 @@ class _SendScreenState extends State<SendScreen> {
   DateTime _lastAt = DateTime.now();
   PairRequest? _pair;
   bool _manual = false;
+  bool _fast = false; // this share runs unencrypted
 
   late final Hotspot _hotspot;
   late Settings _settings;
@@ -116,20 +117,26 @@ class _SendScreenState extends State<SendScreen> {
       return;
     }
     try {
-      final identity = await loadOrCreateIdentity(await getApplicationSupportDirectory());
+      // Fast mode: plain http, no certificate. Otherwise encrypted with the pinned certificate.
+      _fast = _settings.fastMode;
+      final identity = _fast ? null : await loadOrCreateIdentity(await getApplicationSupportDirectory());
       // listens on every network, so the same QR works on the home Wi-Fi and on the hotspot
-      final server = SenderServer(widget.files, TokenStore(), identity: identity, bindAll: true, apk: bundledApk());
+      final server = SenderServer(widget.files, TokenStore(),
+          identity: identity, bindAll: true, apk: bundledApk(), redirect: true);
       final link = await server.start();
       _server = server;
       _subs.add(server.progress.listen(_onProgress));
       _subs.add(server.pairRequests.listen((r) {
         if (mounted) setState(() => _pair = r);
       }));
-      try {
-        _discovery = Discovery(await UdpBeaconTransport.open());
-        await _discovery!.advertise(Platform.localHostname, link.port);
-      } catch (_) {
-        // QR still works without nearby discovery
+      // nearby pairing is encrypted-only, so a Fast (plain) share is not advertised
+      if (!_fast) {
+        try {
+          _discovery = Discovery(await UdpBeaconTransport.open());
+          await _discovery!.advertise(Platform.localHostname, link.port);
+        } catch (_) {
+          // QR still works without nearby discovery
+        }
       }
       _expiresAt = DateTime.now().add(_ttl);
       _remaining = 1;
@@ -312,6 +319,7 @@ class _SendScreenState extends State<SendScreen> {
         remaining: _remaining,
         fraction: _fraction,
         speedMBps: _speed,
+        fast: _fast,
         pairCode: _pair?.code,
         accessCode: _server?.accessCode,
         manualAddress: _server?.shortAddress,
