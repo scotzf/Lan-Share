@@ -5,6 +5,7 @@ import 'dart:ui' show AppExitResponse;
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../core/app_file.dart';
 import '../core/discovery.dart';
 import '../core/hotspot.dart';
 import '../core/hotspot_runner.dart';
@@ -92,12 +93,6 @@ class _SendScreenState extends State<SendScreen> {
     }
   }
 
-  /// The Android app, if it was installed next to this program: offered to phones that lack it.
-  File? _apkFile() {
-    final f = File('${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}lanshare.apk');
-    return f.existsSync() ? f : null;
-  }
-
   Future<void> _saveSettings() async {
     if (widget.settings != null || _supportDir == null) return;
     await _settings.save(_supportDir!);
@@ -123,7 +118,7 @@ class _SendScreenState extends State<SendScreen> {
     try {
       final identity = await loadOrCreateIdentity(await getApplicationSupportDirectory());
       // listens on every network, so the same QR works on the home Wi-Fi and on the hotspot
-      final server = SenderServer(widget.files, TokenStore(), identity: identity, bindAll: true, apk: _apkFile());
+      final server = SenderServer(widget.files, TokenStore(), identity: identity, bindAll: true, apk: bundledApk());
       final link = await server.start();
       _server = server;
       _subs.add(server.progress.listen(_onProgress));

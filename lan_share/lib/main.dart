@@ -4,11 +4,18 @@ import 'dart:io';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
+import 'core/app_file.dart';
+import 'core/app_share.dart';
 import 'core/args.dart';
 import 'core/hotspot.dart';
 import 'core/hotspot_runner.dart';
+import 'core/identity.dart';
+import 'core/lan_address.dart';
+import 'core/settings.dart';
 import 'mobile/mobile_app.dart';
+import 'ui/app_qr_dialog.dart';
 import 'ui/home_view.dart';
 import 'ui/receive_screen.dart';
 import 'ui/send_screen.dart';
@@ -47,6 +54,11 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   bool _dragging = false;
+  Settings _settings = Settings();
+  Directory? _dir;
+  String? _address;
+  Timer? _net;
+  final File? _apk = bundledApk();
 
   @override
   void initState() {
@@ -58,6 +70,47 @@ class _HomeState extends State<Home> {
     // a hotspot left on by a crashed run is turned off and the user's settings restored
     // (when sharing right away, the sending screen does this itself, before it starts a hotspot)
     if (Platform.isWindows && widget.initial.isEmpty) unawaited(Hotspot(powershellRunner).recover());
+    _loadSettings();
+    _refreshAddress();
+    _net = Timer.periodic(const Duration(seconds: 5), (_) => _refreshAddress());
+  }
+
+  @override
+  void dispose() {
+    _net?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadSettings() async {
+    _dir = await getApplicationSupportDirectory();
+    final s = await Settings.load(_dir!);
+    if (mounted) setState(() => _settings = s);
+  }
+
+  /// Which network this laptop is on, shown as a chip; null when there is none.
+  Future<void> _refreshAddress() async {
+    final a = await pickLanAddress();
+    final text = a.isLoopback ? null : a.address;
+    if (mounted && text != _address) setState(() => _address = text);
+  }
+
+  Future<void> _toggleAssist() async {
+    setState(() => _settings.hotspotAssist = !_settings.hotspotAssist);
+    if (_dir != null) await _settings.save(_dir!);
+  }
+
+  /// A QR that sends a phone to the Android app on this laptop; closing it stops the sharing.
+  Future<void> _phoneApp() async {
+    final apk = _apk;
+    if (apk == null) return;
+    final share = AppShare(apk, await loadOrCreateIdentity(await getApplicationSupportDirectory()));
+    try {
+      final url = await share.start();
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (_) => AppQrDialog(url: url));
+    } finally {
+      await share.stop();
+    }
   }
 
   void _send(List<File> files, {bool closeApp = false}) => Navigator.of(context).push(
@@ -89,6 +142,11 @@ class _HomeState extends State<Home> {
             onPick: _pick,
             onReceive: () => Navigator.of(context)
                 .push(MaterialPageRoute(builder: (_) => const ReceiveScreen())),
+            showPhoneApp: _apk != null,
+            onPhoneApp: _phoneApp,
+            assistOn: _settings.hotspotAssist,
+            onToggleAssist: Platform.isWindows ? _toggleAssist : null,
+            address: _address,
           ),
         ),
       );

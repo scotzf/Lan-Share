@@ -3,6 +3,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import 'file_chips.dart';
 import 'pulse.dart';
+import 'responsive.dart';
 import 'theme.dart';
 import 'transfer_ring.dart';
 
@@ -91,7 +92,8 @@ class SendView extends StatelessWidget {
     return GlowBackground(
       color: color,
       child: SafeArea(
-        child: Padding(
+        child: CenteredColumn(
+          child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(children: [
             Row(children: [
@@ -108,6 +110,7 @@ class SendView extends StatelessWidget {
             const SizedBox(height: 16),
             _action(),
           ]),
+        ),
         ),
       ),
     );
